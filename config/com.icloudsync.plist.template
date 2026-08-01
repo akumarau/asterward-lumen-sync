@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template. Generate the real plist with your own paths:
+
+    sed -e "s|__PROJECT_DIR__|$PWD|g" -e "s|__HOME__|$HOME|g" \
+        -e "s|__TARGET_ROOT__|/Volumes/YOUR_DRIVE/iCloud_Import|g" \
+        config/com.icloudsync.plist.template > config/com.icloudsync.plist
+
+    cp config/com.icloudsync.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.icloudsync.plist
+
+  The generated file is gitignored because it contains absolute home paths.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.icloudsync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__PROJECT_DIR__/scripts/99-delta-sync.sh</string>
+    </array>
+
+    <!-- APPLE_ID and CREATOR come from config/migration.env, which the script sources. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TARGET_ROOT</key>
+        <string>__TARGET_ROOT__</string>
+        <key>PATH</key>
+        <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Run monthly at 02:00 local time on the 1st -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Day</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__TARGET_ROOT__/logs/launchd-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__TARGET_ROOT__/logs/launchd-stderr.log</string>
+
+    <!-- launchd has no drive-presence key. 99-delta-sync.sh calls require_mount
+         and exits non-zero if the target volume is not attached. -->
+</dict>
+</plist>

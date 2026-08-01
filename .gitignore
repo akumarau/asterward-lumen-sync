@@ -1,0 +1,17 @@
+# Local machine config, contains the operator's Apple ID. Never commit.
+config/migration.env
+
+# Generated from the .template, contains absolute home paths
+config/com.icloudsync.plist
+
+# IDE
+.idea/
+
+# macOS and exFAT noise
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Logs and build artefacts
+*.log
