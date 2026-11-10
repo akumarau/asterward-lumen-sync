@@ -40,8 +40,33 @@ Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any
 
 - Step 1 (prove the code) is complete. The test import into a separate catalogue was verified: 232 of 232 files, previews, dates, map, MOV playback and copyright all confirmed.
 - Phase 1 is running in a Terminal tab since 18:45. icloudpd reported 31,935 assets. About 4,400 files and 147 GB were on disk at the restart. Do not start a second extract while it runs.
+- At 18:56 the run was at 4,515 files and 152 GB, about 17 files a minute. Rough finish: evening of 11 Nov, longer if Apple throttles.
 - Next once the extract finishes cleanly: phases 2 to 7 on the live config, stopping after each with a status table. Then hand Anupam the import checklist.
-- Anupam leaves on 15 Nov. Anything unfinished resumes when he returns.
+- Anupam is away 15 Nov to 1 Dec. Do not start `copy-new` or anything long unattended in that window unless he asks. Anything unfinished resumes when he returns.
+
+## Environment
+
+- exiftool, fdupes, pipx and python3 are in `/opt/homebrew/bin`. icloudpd is pinned to 1.33.0 in `~/.local/bin`.
+- The iCloud session was renewed with 2FA on 10 Nov 2026 at about 17:00. It usually lasts 2 to 4 weeks, so it may expire while he is away. Renew with `bin/lumen-sync auth` (he types the 2FA code).
+- Lightroom may still have the test catalogue open. Before the real import, he switches back to the master catalogue with File > Open Recent. `match` snapshots the catalogue file, so Lightroom being open is fine for that step.
+
+## Do not touch
+
+- `~/Desktop/icloud-to-lightroom`: his older clone on branch `agent/repair-repository`, with uncommitted local edits.
+- `/Volumes/TOSHIBA_AK/Lightroom Catalog OLD`: an old catalogue copy plus a backup zip, renamed on purpose.
+- Other catalogues: `Glam_Art`, `Studio` and `Lightroom Catalog.lrcat` under `~/Pictures`. Only `Anupam_Photo_Library` is the master.
+
+## Pending decisions (need Anupam's explicit yes)
+
+- Merge branch `asterward-lumen-sync` to `main`, and rename the repo to `asterward-lumen-sync`.
+- Delete `/Volumes/TOSHIBA_AK/LumenSync_Test` and the test catalogue. Deleting needs his approval in any case.
+- Review `quarantine/duplicates` before anything there is removed.
+- Open question: some tier 4 edits may come from frames kept in `Glam_Art` or `Studio`. `match` checks only the master today.
+
+## Later (Step 3)
+
+- Monthly delta sync with `bin/lumen-sync install-schedule` (launchd label `com.asterward.lumensync`). The first run from Terminal grants macOS access to the external drive.
+- Each month: delta, then `match`, then `copy-new`, then a small Add import. Scope it with him first.
 
 ## Decisions already made
 
