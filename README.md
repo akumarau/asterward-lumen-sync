@@ -17,6 +17,8 @@ bin/lumen-sync help
 | `lumen-sync dedupe` | 3. Exact duplicates to quarantine |
 | `lumen-sync metadata` | 4. Sidecars for raw files |
 | `lumen-sync validate` | 5. Integrity sample and report |
+| `lumen-sync match` | 6. Tier iCloud files against the master catalogue |
+| `lumen-sync copy-new` | 7. Copy new files into the master library tree |
 | `lumen-sync delta` | Monthly delta sync |
 | `lumen-sync status` | Counts, disk use, last verdict |
 | `lumen-sync install-schedule` | Load the monthly launchd job |
@@ -85,7 +87,7 @@ Then Add-import the test folder into a **copy** of your catalog and check previe
 
 ## Tests
 
-`tests/run-tests.sh` runs 41 offline checks against a fixture library with a stubbed icloudpd. No Apple account or network needed. On macOS run it under the shell launchd uses:
+`tests/run-tests.sh` runs 65 offline checks against a fixture library with a stubbed icloudpd. No Apple account or network needed. On macOS run it under the shell launchd uses:
 
 ```
 TEST_BASH=/bin/bash tests/run-tests.sh
@@ -114,6 +116,22 @@ For overnight phases, run `caffeinate -dimsu -w $$` in a terminal alongside the 
 ```
 
 This mirrors the `YYYY/YYYY-MM` convention already used by `/Volumes/TOSHIBA_AK/Photo Library/`. The import stays in its own root until Phase 5 passes, so dedup and quarantine can never touch the existing curated library. Merging into `Photo Library/` is a deliberate step taken afterwards.
+
+## Skipping what the catalogue already has
+
+`lumen-sync match` reads a snapshot of your master catalogue (`MASTER_LRCAT`) and the EXIF of every iCloud file, then sorts each file into a tier:
+
+| Tier | Meaning | Action |
+|---|---|---|
+| 1 | Same name and capture time already in the catalogue | Skip |
+| 2 | Same camera and capture moment, different file (camera JPEG of a raw, re-encoded copy) | Skip |
+| 3 | Export of a catalogue photo, written by Lightroom or Photoshop | Skip |
+| 4 | Near match, such as a burst frame missing from the catalogue | Review |
+| 5 | Not in the catalogue | Copy |
+
+Matching uses camera model plus capture time to the millisecond, so Sony file counters that repeat across bodies cannot cause false matches. A Live Photo video always follows its still. The report at `manifests/06-match-report/index.html` shows thumbnails of each match side by side.
+
+`lumen-sync copy-new` then copies tier 5 into `DEST_LIBRARY/YYYY/YYYY-MM/YYYY-MM-DD`, verified by SHA-256, never overwriting. `originals/` stays a complete icloudpd mirror, so later syncs never download anything twice.
 
 ## Metadata handling
 

@@ -9,7 +9,7 @@ set -euo pipefail
 BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$BIN_DIR/.." && pwd)"
 SCRIPTS="$PROJECT_ROOT/scripts"
-VERSION="0.2.0"
+VERSION="0.3.0"
 LABEL="com.asterward.lumensync"
 
 usage() {
@@ -27,6 +27,8 @@ Commands
   dedupe            Phase 3. Move exact duplicates to quarantine
   metadata          Phase 4. Write .xmp sidecars for raw files
   validate          Phase 5. Integrity sample and report
+  match             Phase 6. Tier iCloud files against the master catalogue
+  copy-new          Phase 7. Copy new files into the master library tree
   delta             Monthly delta sync (what launchd runs)
   status            Counts, disk use and the latest validation verdict
   install-schedule  Generate and load the monthly launchd job
@@ -47,6 +49,8 @@ case "$cmd" in
     dedupe)   run 03-dedupe.sh ;;
     metadata) run 04-generate-xmp.sh ;;
     validate) run 05-validate.sh ;;
+    match)    run 06-match.sh ;;
+    copy-new) run 07-copy-new.sh ;;
     delta)    run 99-delta-sync.sh ;;
     auth)
         # shellcheck source=../scripts/lib/common.sh

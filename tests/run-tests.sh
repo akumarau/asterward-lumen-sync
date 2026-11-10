@@ -15,7 +15,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 SH="${TEST_BASH:-bash}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/lumen-tests.XXXXXX")"
-trap 'rm -rf "$WORK"' EXIT
+trap "${KEEP_WORK:+:} rm -rf \"$WORK\"" EXIT
 
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS + 1)); printf '  PASS  %s\n' "$1"; }
@@ -189,6 +189,90 @@ jpg_before="$(hash_tree "$T/originals/2024/2024-05")"
 CONFIG_FILE="$CFG" HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/99-delta-sync.sh" > "$WORK/last.out" 2>&1; rc=$?
 check "second delta run exits 0" '[[ $rc -eq 0 ]]'
 check "delta never rewrites JPEG originals by default" '[[ "$jpg_before" == "$(hash_tree "$T/originals/2024/2024-05")" ]]'
+
+# ---------------------------------------------------------------------------
+echo "== Phase 6 and 7: catalogue match and copy"
+new_target p6
+O="$T/originals"; M1="$O/2024/2024-03"; M2="$O/2024/2024-04"
+LIB="$WORK/p6/Photo Library"; mkdir -p "$LIB"
+# iCloud side EXIF. Tier 2: camera JPEG of a catalogue ARW. Tier 3: Lightroom
+# export of a catalogue ARW. Tier 1: identical name and moment. Tier 4: burst
+# frame not in the catalogue. Tier 5: iPhone photo and its Live Photo video.
+exiftool -q -overwrite_original -Model=ILCE-1 '-DateTimeOriginal=2026:05:10 10:00:00' -SubSecTimeOriginal=120 "$M2/DSC00042.JPG"
+exiftool -q -overwrite_original -Model=ILCE-1 '-DateTimeOriginal=2026:05:10 11:00:00' -SubSecTimeOriginal=500 '-Software=Adobe Lightroom Classic 15.6 (Macintosh)' "$M1/IMG_0003.JPG"
+exiftool -q -overwrite_original -Model=ILCE-1 '-DateTimeOriginal=2026:05:11 12:00:00' -SubSecTimeOriginal=050 "$M2/IMG_0003 copy.JPG"
+exiftool -q -overwrite_original -Model=ILCE-1M2 '-DateTimeOriginal=2026:06:01 09:00:00' -SubSecTimeOriginal=300 "$M2/DSC00042-691516.JPG"
+exiftool -q -overwrite_original '-Model=iPhone 16 Pro' '-DateTimeOriginal=2024:03:02 08:00:00' -SubSecTimeOriginal=001 "$M1/IMG_0001.JPG"
+cp "$M1/IMG_0002.MOV" "$M2/C0001.MP4"; touch -t 202605121200 "$M2/C0001.MP4"
+python3 - "$WORK/p6/master.lrcat" <<'PYC'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.executescript("""
+CREATE TABLE AgLibraryRootFolder(id_local INTEGER PRIMARY KEY, absolutePath TEXT);
+CREATE TABLE AgLibraryFolder(id_local INTEGER PRIMARY KEY, pathFromRoot TEXT, rootFolder INTEGER);
+CREATE TABLE AgLibraryFile(id_local INTEGER PRIMARY KEY, baseName TEXT, extension TEXT, folder INTEGER, sidecarExtensions TEXT, originalFilename TEXT);
+CREATE TABLE Adobe_images(id_local INTEGER PRIMARY KEY, rootFile INTEGER, captureTime TEXT, fileFormat TEXT, masterImage INTEGER);
+CREATE TABLE AgInternedExifCameraModel(id_local INTEGER PRIMARY KEY, value TEXT);
+CREATE TABLE AgHarvestedExifMetadata(id_local INTEGER PRIMARY KEY, image INTEGER, cameraModelRef INTEGER);
+INSERT INTO AgLibraryRootFolder VALUES(1,'/Volumes/X/Photo Library/');
+INSERT INTO AgLibraryFolder VALUES(1,'2026/2026-05/2026-05-10/',1);
+INSERT INTO AgInternedExifCameraModel VALUES(1,'ILCE-1'),(2,'ILCE-1M2');
+""")
+rows = [  # id, base, ext, capture, format, model
+  (1,'DSC00042','ARW','2026-05-10T10:00:00.120','RAW',1),
+  (2,'DSC00050','ARW','2026-05-10T11:00:00.500','RAW',1),
+  (3,'IMG_0003 copy','JPG','2026-05-11T12:00:00.050','JPG',1),
+  (4,'DSC09000','ARW','2026-06-01T09:00:00.100','RAW',2),
+  (5,'DSC09001','ARW','2026-06-01T09:00:00.200','RAW',2),
+  (6,'C0001','MP4','2026-05-12T09:00:00','VIDEO',None),
+]
+for i, b, e, c, f, m in rows:
+    db.execute("INSERT INTO AgLibraryFile VALUES(?,?,?,1,'',?)", (i, b, e, b + '.' + e))
+    db.execute("INSERT INTO Adobe_images VALUES(?,?,?,?,NULL)", (i, i, c, f))
+    if m: db.execute("INSERT INTO AgHarvestedExifMetadata VALUES(?,?,?)", (i, i, m))
+# A virtual copy must not count as a second photo.
+db.execute("INSERT INTO Adobe_images VALUES(7,1,'2026-05-10T10:00:00.120','RAW',1)")
+db.commit()
+PYC
+{ printf 'MASTER_LRCAT=%q\n' "$WORK/p6/master.lrcat"; printf 'DEST_LIBRARY=%q\n' "$LIB"; echo 'COPY_MIN_FREE_GB=0'; } >> "$CFG"
+before="$(hash_tree "$O")"
+phase 06-match.sh; rc=$?
+MC="$T/manifests/06-match.csv"
+tier_of() { python3 -c 'import csv,sys
+for r in csv.DictReader(open(sys.argv[1])):
+    if r["relpath"].endswith(sys.argv[2]): print(r["tier"]); break' "$MC" "$1"; }
+check "match exits 0" '[[ $rc -eq 0 && -s "$MC" ]]'
+check "camera JPEG of a catalogue ARW is tier 2" '[[ "$(tier_of 2024-04/DSC00042.JPG)" == 2 ]]'
+check "Lightroom export of a catalogue photo is tier 3" '[[ "$(tier_of 2024-03/IMG_0003.JPG)" == 3 ]]'
+check "same name and moment is tier 1" '[[ "$(tier_of "2024-04/IMG_0003 copy.JPG")" == 1 ]]'
+check "burst frame missing from catalogue is tier 4" '[[ "$(tier_of 2024-04/DSC00042-691516.JPG)" == 4 ]]'
+check "iPhone photo is tier 5" '[[ "$(tier_of 2024-03/IMG_0001.JPG)" == 5 ]]'
+check "Live Photo video of a new still is tier 5" '[[ "$(tier_of 2024-03/IMG_0001_HEVC.MOV)" == 5 ]]'
+check "catalogue video with same name and date is tier 2" '[[ "$(tier_of 2024-04/C0001.MP4)" == 2 ]]'
+check "report written" '[[ -s "$T/manifests/06-match-report/index.html" ]]'
+check "EXIF cache written" '[[ -s "$T/manifests/06-exif-cache.json" ]]'
+check "match never changes originals" '[[ "$before" == "$(hash_tree "$O")" ]]'
+phase 06-match.sh
+check "second match run reads no EXIF again" 'grep -q "Reading EXIF for 0 of" "$WORK/last.out"'
+
+phase 07-copy-new.sh; rc=$?
+check "copy refuses without a finished extract" '[[ $rc -ne 0 ]] && grep -q "did not finish a full pass" "$WORK/last.out"'
+sed 's/^COPY_MIN_FREE_GB=0$/COPY_MIN_FREE_GB=999999/' "$CFG" > "$CFG.floor"
+CONFIG_FILE="$CFG.floor" FORCE=1 "$SH" "$ROOT/scripts/07-copy-new.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "copy stops and fails below the free space floor" '[[ $rc -ne 0 ]] && grep -q "STOP: less than" "$WORK/last.out" && [[ -z "$(find "$LIB" -type f)" ]]'
+# A different file already sitting at the destination name must survive.
+mkdir -p "$LIB/2024/2024-03/2024-03-02"; printf 'someone else' > "$LIB/2024/2024-03/2024-03-02/IMG_0001.JPG"
+CONFIG_FILE="$CFG" FORCE=1 "$SH" "$ROOT/scripts/07-copy-new.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "copy exits 0" '[[ $rc -eq 0 ]]'
+check "new photo copied into YYYY/YYYY-MM/YYYY-MM-DD by capture date" '[[ -f "$LIB/2024/2024-03/2024-03-02/IMG_0001__icloud1.JPG" ]]'
+check "existing different file is not overwritten" '[[ "$(cat "$LIB/2024/2024-03/2024-03-02/IMG_0001.JPG")" == "someone else" ]]'
+check "skipped tiers are not copied" '! find "$LIB" -name "DSC00042*" | grep -q . && ! find "$LIB" -name "C0001*" | grep -q .'
+check "copy never changes originals" '[[ "$before" == "$(hash_tree "$O")" ]]'
+check "copies match their source bytes" 'cmp -s "$M1/IMG_0001.JPG" "$LIB/2024/2024-03/2024-03-02/IMG_0001__icloud1.JPG"'
+check "Live Photo video lands beside its still" '[[ -f "$LIB/2024/2024-03/2024-03-02/IMG_0001_HEVC.MOV" ]]'
+n1=$(find "$LIB" -type f | wc -l | tr -d " ")
+CONFIG_FILE="$CFG" FORCE=1 "$SH" "$ROOT/scripts/07-copy-new.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "copy re-run copies nothing new" '[[ $rc -eq 0 && $(find "$LIB" -type f | wc -l | tr -d " ") -eq $n1 ]] && grep -q "Copied: 0" "$WORK/last.out"'
 
 # ---------------------------------------------------------------------------
 echo "== CLI"
