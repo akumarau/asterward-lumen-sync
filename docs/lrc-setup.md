@@ -24,7 +24,7 @@ Do this once, after `05-validate.sh` passes.
 
 1. Open Lightroom Classic. Confirm the SSD-hosted catalog is open.
 2. File > Import Photos and Video (or Cmd+Shift+I).
-3. Source panel (left): navigate to `/Volumes/TOSHIBA_AK/iCloud_Import/originals/`. Tick "Include Subfolders".
+3. Source panel (left): navigate to `/Volumes/TOSHIBA_AK/iCloud_Import/originals/`. Tick "Include Subfolders". Select `originals/` itself, never `iCloud_Import/`: from the parent, Include Subfolders also imports `quarantine/`, and its duplicates land in the catalogue. (Seen in the Step 1 test import.)
 4. Top bar: select **Add**. This leaves files in place and only adds catalog entries.
 5. Right panel:
    - **File Handling**: Build Previews = Standard, Build Smart Previews = off, Do Not Import Suspected Duplicates = on.
