@@ -1,6 +1,6 @@
-# GHCP Agent Instructions: iCloud to LRC Migration
+# GHCP Agent Instructions: Asterward Lumen Sync
 
-You are executing a multi-phase migration of a 500 GB+ iCloud Photos library to Lightroom Classic on macOS. The user is a technical operator who wants minimal hand-holding but wants you to verify every phase before declaring it complete.
+You are executing a multi-phase migration of an ~850 GB iCloud Photos library (Asterward Lumen Sync) to Lightroom Classic on macOS. The user is a technical operator who wants minimal hand-holding but wants you to verify every phase before declaring it complete.
 
 ## Ground rules
 
@@ -35,6 +35,8 @@ For each phase:
 
 **Expected runtime.** 30 to 80 hours split across multiple overnight sessions.
 
+**Sample run first.** `RECENT=100 bin/lumen-sync extract` against a test `CONFIG_FILE` proves the pipeline before the full run.
+
 ## Phase 2: Organise (`02-organise.sh`)
 
 **Intent.** Move any files icloudpd placed in unexpected locations into the canonical YYYY/YYYY-MM structure. Separate Live Photo MOVs into a sibling folder if the user opted for that.
@@ -55,10 +57,11 @@ For each phase:
 
 ## Phase 4: Apply metadata preset (`04-generate-xmp.sh`)
 
-**Intent.** Apply the copyright/creator preset so LRC picks it up on import. LRC only reads `.xmp` sidecars for proprietary raw formats, so raw files get sidecars and HEIC/JPEG/TIFF/PNG get metadata embedded directly. Image data is never re-encoded.
+**Intent.** Write `.xmp` sidecars for proprietary raw formats. HEIC, JPEG, TIFF, PNG and DNG get copyright from an LRC import preset instead, so originals are never modified.
 
 **Success criteria.**
-- Every raw file (arw, dng, cr2, cr3, nef, orf, raf, rw2) has a matching `.xmp` sidecar
+- Every raw file (arw, cr2, cr3, nef, orf, raf, rw2) has a matching `.xmp` sidecar
+- Phase 4 exits 0 and the manifest shows zero errors and zero missing sidecars
 - XMP and IPTC contents include the copyright and creator fields
 - No files failed with exiftool errors beyond tolerated minor warnings
 
@@ -78,10 +81,10 @@ For each phase:
 
 ## Phase 7: Install ongoing sync
 
-**Intent.** Generate `config/com.icloudsync.plist` from the template with local paths, then load it into launchd for monthly delta syncs.
+**Intent.** Run `bin/lumen-sync install-schedule`. It generates `config/com.asterward.lumensync.plist` from the template, lints it and loads it into launchd for monthly delta syncs.
 
 **Success criteria.**
-- `launchctl list | grep icloudsync` shows the job loaded
+- `launchctl list | grep lumensync` shows the job loaded
 - Dry-run of the delta script exits cleanly
 
 ## Communication style

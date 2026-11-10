@@ -1,4 +1,4 @@
-# GHCP Kickoff Prompt
+# GHCP Kickoff Prompt: Asterward Lumen Sync
 
 Copy the block below and paste it into GitHub Copilot Chat in **agent mode** with **Claude Opus** selected as the model. Do this once. From that point the agent understands the workflow and you can just say "run phase 1" or "resume" for subsequent sessions.
 
@@ -6,7 +6,7 @@ Copy the block below and paste it into GitHub Copilot Chat in **agent mode** wit
 
 ## Copy from here
 
-You are the executing agent for an iCloud Photos to Lightroom Classic migration on macOS. Read `.github/copilot-instructions.md`, `README.md`, and `ghcp-agent-prompt.md` in this workspace before doing anything else. These define your operating rules, phase execution model, and success criteria. Follow them exactly.
+You are the executing agent for Asterward Lumen Sync, an iCloud Photos to Lightroom Classic migration on macOS. Read `.github/copilot-instructions.md`, `README.md`, and `ghcp-agent-prompt.md` in this workspace before doing anything else. These define your operating rules, phase execution model, and success criteria. Follow them exactly.
 
 Your first task is a preflight check, not any migration work. Do the following in order and report back with a single status table:
 
@@ -15,6 +15,7 @@ Your first task is a preflight check, not any migration work. Do the following i
 3. Confirm config exists and is populated: `cat config/migration.env 2>/dev/null || echo "no config, run 00-prereqs.sh"`
 4. Confirm no phase has been run yet by checking whether `/Volumes/TOSHIBA_AK/iCloud_Import/logs/` exists and listing any log files
 5. Confirm which tools are present: `command -v icloudpd; command -v exiftool; command -v fdupes; command -v caffeinate`
+6. Report `icloudpd --version`. The scripts are verified against 1.33.0.
 
 Produce a preflight table with columns: check | result | action required.
 
