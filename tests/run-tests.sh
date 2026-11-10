@@ -138,6 +138,10 @@ esac
 if [[ "\${STUB_MODE:-ok}" == "badargs" && " \$* " == *" --dry-run "* ]]; then
   echo "Error: No such option: --bogus"; exit 2
 fi
+if [[ "\${STUB_MODE:-ok}" == "throttle" && " \$* " != *" --dry-run "* && " \$* " != *" --auth-only "* && ! -f "\$STUB_LOG.throttled" ]]; then
+  touch "\$STUB_LOG.throttled"
+  echo "2026-11-10 17:41:36 INFO     Apple iCloud is temporary refusing to serve icloudpd"; exit 1
+fi
 case " \$* " in
   *" --auth-only "*) echo "Authentication completed successfully"; exit 0 ;;
   *" --dry-run "*) echo "2026-11-10 10:00:00 INFO     Looking up all photos and videos..."; exit 0 ;;
@@ -172,6 +176,12 @@ check "downloaded file landed" '[[ -f "$T/originals/2024/2024-05/IMG_0100.JPG" ]
 new_target p1bad
 CONFIG_FILE="$CFG" STUB_MODE=badargs HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
 check "rejected arguments stop the run" '[[ $rc -ne 0 ]] && grep -q "rejected the arguments" "$WORK/last.out"'
+
+new_target p1throttle
+rm -f "$STUB_LOG.throttled"
+CONFIG_FILE="$CFG" STUB_MODE=throttle EXTRACT_BACKOFF_MIN=0 HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "throttled download waits and resumes, then succeeds" '[[ $rc -eq 0 ]] && grep -q "Waiting 0 min, then resuming" "$WORK/last.out" && grep -q "attempt 2 of" "$WORK/last.out"'
+check "resumed download landed" '[[ -f "$T/originals/2024/2024-05/IMG_0100.JPG" ]]'
 
 new_target p1rec
 CONFIG_FILE="$CFG" RECENT=abc HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?

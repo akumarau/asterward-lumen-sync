@@ -91,15 +91,38 @@ if grep -qE '^[0-9-]+ [0-9:]+ ERROR|Password provider|Two-step|two-factor' <<<"$
 fi
 log "Arguments accepted, API reachable"
 
-# Count lines written by THIS download, not the auth and smoke output above.
-RUN_START_LINE=$(( $(wc -l < "$LOG_FILE") + 1 ))
-
-set +e
-icloudpd "${ARGS[@]}" 2>&1 | tee -a "$LOG_FILE"
-EXIT_CODE=${PIPESTATUS[0]}
-set -e
-
-log "icloudpd exit code: $EXIT_CODE"
+# Apple throttles long runs with HTTP 503 ("temporary refusing to serve").
+# The session stays valid, so wait and resume rather than stopping for the
+# night. Waits double from EXTRACT_BACKOFF_MIN up to 2 hours. An expired
+# session or a 2FA request needs a person, so that is never retried.
+EXTRACT_RETRIES="${EXTRACT_RETRIES:-12}"
+EXTRACT_BACKOFF_MIN="${EXTRACT_BACKOFF_MIN:-15}"
+RETRY_RE='temporary refusing|Service Unavailable|Connection (aborted|reset)|Read timed out|Max retries exceeded|RemoteDisconnected'
+AUTH_RE='Two-step|two-factor|Authentication required|Password provider|Invalid email/password'
+attempt=1
+wait_min="$EXTRACT_BACKOFF_MIN"
+while :; do
+    # Count lines written by THIS attempt, not the auth, smoke or earlier attempts.
+    RUN_START_LINE=$(( $(wc -l < "$LOG_FILE") + 1 ))
+    set +e
+    icloudpd "${ARGS[@]}" < /dev/null 2>&1 | tee -a "$LOG_FILE"
+    EXIT_CODE=${PIPESTATUS[0]}
+    set -e
+    log "icloudpd exit code: $EXIT_CODE (attempt $attempt of $EXTRACT_RETRIES)"
+    (( EXIT_CODE == 0 )) && break
+    SEGMENT="$(tail -n +"$RUN_START_LINE" "$LOG_FILE")"
+    if grep -qE "$AUTH_RE" <<<"$SEGMENT"; then
+        log "iCloud wants to sign in again. Run: bin/lumen-sync auth, then this script."
+        break
+    fi
+    if (( attempt >= EXTRACT_RETRIES )) || ! grep -qE "$RETRY_RE" <<<"$SEGMENT"; then
+        break
+    fi
+    log "Apple is throttling or the connection dropped. Files so far: $(corpus_count "$TARGET_ROOT/originals"). Waiting $wait_min min, then resuming."
+    sleep $(( wait_min * 60 ))
+    attempt=$(( attempt + 1 ))
+    wait_min=$(( wait_min * 2 > 120 ? 120 : wait_min * 2 ))
+done
 
 ERR_RE='is incorrect|^usage:|CRITICAL|Failed to download|ACCESS_DENIED|private db access disabled'
 if tail -n +"$RUN_START_LINE" "$LOG_FILE" | grep -qE "$ERR_RE"; then
