@@ -38,7 +38,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
         echo "KEEP_LIVE_PHOTO_MOVS=1"
         echo "EMBED_METADATA=0"
         echo "ADP_WEB_ACCESS=0"
-        echo "MIN_FREE_GB=1100"
+        echo "MIN_FREE_GB=${MIN_FREE_GB:-1100}"
     } > "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
     # shellcheck disable=SC1090
