@@ -121,7 +121,7 @@ log "Total size on disk: ${TOTAL_SIZE_GB} GB"
 # whose size no longer matches iCloud, usually because something rewrote it.
 SUFFIXED=$(corpus_count "$TARGET_ROOT/originals" -regex '.*-[0-9][0-9][0-9][0-9]*\.[A-Za-z0-9]*$')
 if (( SUFFIXED > 0 )); then
-    log "NOTE: $SUFFIXED files carry an icloudpd size suffix. Check whether originals were modified after download."
+    log "NOTE: $SUFFIXED files carry an icloudpd size suffix (IMG_1234-<bytes>.JPG). Most are distinct photos that share a name. Exact copies are caught by Phase 3."
 fi
 
 # Leftovers here mean a run was interrupted mid-download. Re-running clears them.

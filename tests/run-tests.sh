@@ -82,12 +82,14 @@ echo "== Phase 3: dedupe"
 new_target p3
 phase 03-dedupe.sh; rc=$?
 check "phase 3 exits 0" '[[ $rc -eq 0 ]]'
-check "one duplicate quarantined" '[[ $(find "$T/quarantine/duplicates" -type f ! -name "._*" | wc -l | tr -d " ") -eq 1 ]]'
+# Two true duplicate pairs: IMG_0003 across months, DSC00042 with a size suffix.
+check "duplicates quarantined" '[[ $(find "$T/quarantine/duplicates" -type f ! -name "._*" | wc -l | tr -d " ") -eq 2 ]]'
 check "keeper still in originals" '[[ -f "$T/originals/2024/2024-03/IMG_0003.JPG" ]]'
+check "plain name kept over icloudpd size-suffixed copy" '[[ -f "$T/originals/2024/2024-04/DSC00042.JPG" && ! -f "$T/originals/2024/2024-04/DSC00042-691516.JPG" ]]'
 check "AppleDouble files not treated as duplicates" '[[ -f "$T/originals/2024/2024-03/._IMG_0001.JPG" ]]'
-check "manifest has one row plus header" '[[ $(wc -l < "$T/manifests/03-dedupe.csv" | tr -d " ") -eq 2 ]]'
+check "manifest has two rows plus header" '[[ $(wc -l < "$T/manifests/03-dedupe.csv" | tr -d " ") -eq 3 ]]'
 phase 03-dedupe.sh; rc=$?
-check "re-run is idempotent" '[[ $rc -eq 0 && $(find "$T/quarantine/duplicates" -type f ! -name "._*" | wc -l | tr -d " ") -eq 1 ]]'
+check "re-run is idempotent" '[[ $rc -eq 0 && $(find "$T/quarantine/duplicates" -type f ! -name "._*" | wc -l | tr -d " ") -eq 2 ]]'
 
 # ---------------------------------------------------------------------------
 echo "== Phase 4: metadata (default, originals untouched)"

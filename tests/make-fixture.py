@@ -65,6 +65,20 @@ JPEG_NEW = (
     "uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD5Xooo"
     "piP/2Q=="
 )
+JPEG_SONY = (
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcU"
+    "FhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgo"
+    "KCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAgDASIA"
+    "AhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQA"
+    "AAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3"
+    "ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWm"
+    "p6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEA"
+    "AwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSEx"
+    "BhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElK"
+    "U1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3"
+    "uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDyyiii"
+    "vIPTP//Z"
+)
 PNG_GREY = (
     "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFklEQVR4XmOsqKhgwAaYsIoyMAxS"
     "CQAdhwF4I7KkBgAAAABJRU5ErkJggg=="
@@ -113,6 +127,11 @@ def library(root):
     # Exact duplicate in a later month.
     put(os.path.join(m1, "IMG_0003.JPG"), JPEG_GREEN)
     put(os.path.join(m2, "IMG_0003 copy.JPG"), JPEG_GREEN)
+
+    # icloudpd size-suffix copy of the same asset, as seen on the real drive.
+    # Dedupe must keep the plain name, which is what icloudpd looks for.
+    put(os.path.join(m2, "DSC00042.JPG"), JPEG_SONY)
+    put(os.path.join(m2, "DSC00042-691516.JPG"), JPEG_SONY)
 
     # Raw stand-in and a PNG.
     put(os.path.join(m2, "DSC_0004.ARW"), TIFF_BLUE)
