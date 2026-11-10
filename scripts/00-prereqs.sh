@@ -81,7 +81,8 @@ if ! command -v pipx >/dev/null 2>&1; then
     brew install pipx
     pipx ensurepath
 fi
-export PATH="$HOME/.local/bin:$PATH"
+# Append, never prepend: whatever is already first on PATH keeps priority.
+export PATH="$PATH:$HOME/.local/bin"
 
 # Pin icloudpd. Its flags and its existing-file matching change between
 # releases, and an unpinned --force reinstall can change behaviour mid-migration.

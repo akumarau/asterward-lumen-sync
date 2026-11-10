@@ -12,7 +12,9 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
 : "${APPLE_ID:?ERROR: run 00-prereqs.sh first to create config/migration.env}"
-export PATH="$HOME/.local/bin:$PATH"
+# Append, never prepend: whatever is already first on PATH keeps priority,
+# which also lets the test suite substitute a stub icloudpd.
+export PATH="$PATH:$HOME/.local/bin"
 RECENT="${RECENT:-}"
 
 require_mount

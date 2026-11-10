@@ -149,33 +149,42 @@ STUB
 chmod +x "$STUB_BIN/icloudpd"
 export STUB_LOG="$WORK/stub.log"
 
+# A decoy icloudpd where pipx installs the real one. If any script lets
+# ~/.local/bin win over the stub, the decoy fails the run loudly instead of
+# reaching Apple with the test account. HOME is redirected for every call.
+FAKE_HOME="$WORK/home"
+mkdir -p "$FAKE_HOME/.local/bin"
+printf '#!/usr/bin/env bash\necho "DECOY icloudpd was called"\nexit 97\n' > "$FAKE_HOME/.local/bin/icloudpd"
+chmod +x "$FAKE_HOME/.local/bin/icloudpd"
+
 new_target p1
 : > "$STUB_LOG"
-CONFIG_FILE="$CFG" RECENT=5 PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
+CONFIG_FILE="$CFG" RECENT=5 HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
 check "extract exits 0" '[[ $rc -eq 0 ]]'
+check "stub icloudpd wins over ~/.local/bin" '! grep -q DECOY "$WORK/last.out"'
 check "auth runs in the foreground before the smoke test" 'grep -n -- "--auth-only" "$STUB_LOG" | head -1 | grep -q "^[0-9]*:" && [[ $(grep -n -- "--auth-only" "$STUB_LOG" | head -1 | cut -d: -f1) -lt $(grep -n -- "--dry-run" "$STUB_LOG" | head -1 | cut -d: -f1) ]]'
 check "sample mode passes --recent 5" 'grep -v -- "--dry-run" "$STUB_LOG" | grep -v -- "--auth-only" | grep -v -- "--help" | grep -q -- "--recent 5"'
 check "verified flags are passed" 'grep -q -- "--size original" "$STUB_LOG" && grep -q -- "--folder-structure {:%Y/%Y-%m}" "$STUB_LOG"'
 check "downloaded file landed" '[[ -f "$T/originals/2024/2024-05/IMG_0100.JPG" ]]'
 
 new_target p1bad
-CONFIG_FILE="$CFG" STUB_MODE=badargs PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
+CONFIG_FILE="$CFG" STUB_MODE=badargs HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
 check "rejected arguments stop the run" '[[ $rc -ne 0 ]] && grep -q "rejected the arguments" "$WORK/last.out"'
 
 new_target p1rec
-CONFIG_FILE="$CFG" RECENT=abc PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
+CONFIG_FILE="$CFG" RECENT=abc HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
 check "non numeric RECENT is refused" '[[ $rc -ne 0 ]]'
 
 # ---------------------------------------------------------------------------
 echo "== Delta sync with a stub icloudpd"
 new_target p99
 : > "$STUB_LOG"
-CONFIG_FILE="$CFG" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/99-delta-sync.sh" > "$WORK/last.out" 2>&1; rc=$?
+CONFIG_FILE="$CFG" HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/99-delta-sync.sh" > "$WORK/last.out" 2>&1; rc=$?
 check "first delta run (no stamp yet) exits 0" '[[ $rc -eq 0 ]] && ! grep -q "unbound variable" "$WORK/last.out"'
 check "stamp written" '[[ -f "$T/.last-delta" ]]'
 check "new raw file gets a sidecar" '[[ -f "$T/originals/2024/2024-05/DSC_0101.xmp" ]]'
 jpg_before="$(hash_tree "$T/originals/2024/2024-05")"
-CONFIG_FILE="$CFG" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/99-delta-sync.sh" > "$WORK/last.out" 2>&1; rc=$?
+CONFIG_FILE="$CFG" HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/99-delta-sync.sh" > "$WORK/last.out" 2>&1; rc=$?
 check "second delta run exits 0" '[[ $rc -eq 0 ]]'
 check "delta never rewrites JPEG originals by default" '[[ "$jpg_before" == "$(hash_tree "$T/originals/2024/2024-05")" ]]'
 

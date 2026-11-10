@@ -12,7 +12,8 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
 : "${APPLE_ID:?ERROR: run 00-prereqs.sh first to create config/migration.env}"
-export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+# Append, never prepend. launchd already supplies these via the plist PATH.
+export PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"
 DELTA_RECENT="${DELTA_RECENT:-500}"
 
 require_mount

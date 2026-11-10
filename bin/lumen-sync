@@ -52,7 +52,7 @@ case "$cmd" in
         # shellcheck source=../scripts/lib/common.sh
         source "$SCRIPTS/lib/common.sh"
         : "${APPLE_ID:?ERROR: run lumen-sync prereqs first}"
-        export PATH="$HOME/.local/bin:$PATH"
+        export PATH="$PATH:$HOME/.local/bin"
         require_mount
         args=(--username "$APPLE_ID" --directory "$TARGET_ROOT/originals"
               --cookie-directory "$TARGET_ROOT/.icloudpd-cache" --auth-only)
