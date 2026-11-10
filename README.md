@@ -91,7 +91,7 @@ Then Add-import the test folder into a **copy** of your catalog and check previe
 TEST_BASH=/bin/bash tests/run-tests.sh
 ```
 
-Needs python3 with Pillow (`pip3 install pillow`), exiftool and fdupes.
+Needs python3, exiftool and fdupes. No Python packages.
 
 ## How to run this with an agent
 

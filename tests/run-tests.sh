@@ -7,7 +7,7 @@
 #   TEST_BASH=/bin/bash tests/run-tests.sh   # on macOS: test under bash 3.2,
 #                                            # the shell launchd uses
 #
-# Needs: python3 with Pillow, exiftool, fdupes. shellcheck is optional.
+# Needs: python3 (standard library only), exiftool, fdupes. shellcheck is optional.
 
 set -uo pipefail
 
@@ -142,9 +142,7 @@ case " \$* " in
 esac
 dir=""; prev=""
 for a in "\$@"; do [[ "\$prev" == "--directory" ]] && dir="\$a"; prev="\$a"; done
-mkdir -p "\$dir/2024/2024-05"
-python3 -c "from PIL import Image; Image.new('RGB',(8,8),(1,2,3)).save('\$dir/2024/2024-05/IMG_0100.JPG','JPEG')"
-python3 -c "from PIL import Image; Image.new('RGB',(8,8),(4,5,6)).save('\$dir/2024/2024-05/DSC_0101.ARW','TIFF')"
+python3 -I "$HERE/make-fixture.py" --download "\$dir"
 echo "2026-11-10 10:00:01 INFO     All photos have been downloaded"
 exit 0
 STUB
