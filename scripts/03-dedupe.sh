@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 03-dedupe.sh
+# Asterward Lumen Sync, Phase 3.
 # Identify true content duplicates via fdupes, confirm with SHA-256, move to quarantine.
 # Never deletes. User can inspect quarantine and delete manually after review.
 
@@ -101,6 +102,6 @@ PY
 
 AFTER=$(corpus_count "$TARGET_ROOT/originals")
 MOVED=$(( BEFORE - AFTER ))
-RECLAIMED_MB=$(du -sm "$QUARANTINE" | awk '{print $1}')
+RECLAIMED_MB=$(size_mb "$QUARANTINE")
 log "originals/ went from $BEFORE to $AFTER files"
 log "Moved $MOVED duplicates to quarantine, ${RECLAIMED_MB} MB reclaimable after your review"

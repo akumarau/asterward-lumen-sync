@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
 # 01-extract.sh
-# Extract all originals from iCloud Photos. Resume-safe. Designed to run overnight.
-# On first execution, prompts for the Apple ID password and 2FA code interactively.
-# Session cookies cached in .icloudpd-cache, valid for approx 2 to 4 weeks after that.
+# Asterward Lumen Sync, Phase 1.
+# Extract originals from iCloud Photos. Resume-safe. Designed to run overnight.
+# Prompts for the Apple ID password and 2FA code when the cached session is
+# missing or expired. A valid session lasts roughly 2 to 4 weeks.
+#
+# Sample run: RECENT=100 limits the run to the 100 most recent assets. Use it
+# with a test TARGET_ROOT before committing to the full library.
 
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
 : "${APPLE_ID:?ERROR: run 00-prereqs.sh first to create config/migration.env}"
 export PATH="$HOME/.local/bin:$PATH"
+RECENT="${RECENT:-}"
 
 require_mount
 [[ -d "$TARGET_ROOT/originals" ]] || die "Run 00-prereqs.sh first"
-check_free_space 100
+check_free_space "${EXTRACT_MIN_FREE_GB:-100}"
 
 LOG_FILE="$TARGET_ROOT/logs/01-extract-$(date -u +%Y%m%dT%H%M%SZ).log"
 
@@ -22,60 +27,70 @@ log "Apple ID: $APPLE_ID"
 log "Files already present: $BEFORE_COUNT"
 log "Log: $LOG_FILE"
 
+if [[ -n "$RECENT" ]]; then
+    [[ "$RECENT" =~ ^[0-9]+$ ]] || die "RECENT must be a whole number, got '$RECENT'"
+fi
+
 # icloudpd's option set drifts between releases. Build the argument list against
 # the help output captured in Phase 0 so an unknown flag cannot abort a long run.
-ICLOUDPD_HELP="$TARGET_ROOT/manifests/00-icloudpd-help.txt"
-[[ -s "$ICLOUDPD_HELP" ]] || icloudpd --help > "$ICLOUDPD_HELP" 2>&1 || true
-
-supports() { grep -q -- "$1" "$ICLOUDPD_HELP" 2>/dev/null; }
-
-ARGS=(
-    --directory "$TARGET_ROOT/originals"
-    --username "$APPLE_ID"
-    --folder-structure "{:%Y/%Y-%m}"
-    --cookie-directory "$TARGET_ROOT/.icloudpd-cache"
-    --log-level info
-)
-if supports "--size"; then ARGS+=(--size original); fi
-if supports "--set-exif-datetime"; then ARGS+=(--set-exif-datetime); fi
-if supports "--live-photo-size"; then ARGS+=(--live-photo-size original); fi
-if supports "--no-progress-bar"; then ARGS+=(--no-progress-bar); fi
+ensure_icloudpd_help
+build_icloudpd_args
+ARGS=("${ICLOUDPD_ARGS[@]}")
+if [[ -n "$RECENT" ]]; then
+    ARGS+=(--recent "$RECENT")
+    log "SAMPLE MODE: limited to the $RECENT most recent assets"
+fi
 # No --skip-created-before. Assets with a missing or bogus creation date would be
 # silently dropped, and completeness matters more than tidiness here.
-# No --threads-num either, icloudpd 1.32 deprecated it and pins concurrency to 1.
+# No --threads-num either. icloudpd deprecated it and pins concurrency to 1.
 
 log "icloudpd args: ${ARGS[*]}"
 
-# Authenticate first so the 2FA prompt appears immediately rather than buried in
-# a multi-hour run. Cookies then last a few weeks.
-if [[ -z "$(ls -A "$TARGET_ROOT/.icloudpd-cache" 2>/dev/null)" ]]; then
-    log "No cached session found, authenticating first. Expect a 2FA prompt."
-    icloudpd --username "$APPLE_ID" \
-        --directory "$TARGET_ROOT/originals" \
-        --cookie-directory "$TARGET_ROOT/.icloudpd-cache" \
-        --auth-only 2>&1 | tee -a "$LOG_FILE"
+# Always authenticate in the foreground first. It is quick when the cached
+# session is still valid, and when it has expired the password and 2FA prompts
+# appear here, on screen. Previously this only ran when the cache folder was
+# empty, so an EXPIRED session prompted inside the captured smoke test below
+# and the script appeared to hang with no visible prompt.
+AUTH_ARGS=(
+    --username "$APPLE_ID"
+    --directory "$TARGET_ROOT/originals"
+    --cookie-directory "$TARGET_ROOT/.icloudpd-cache"
+    --auth-only
+)
+if [[ "$ADP_WEB_ACCESS" == "1" ]]; then AUTH_ARGS+=(--adp-web-access); fi
+log "Checking iCloud session. Enter password and 2FA code if prompted."
+set +e
+icloudpd "${AUTH_ARGS[@]}" 2>&1 | tee -a "$LOG_FILE"
+AUTH_RC=${PIPESTATUS[0]}
+set -e
+if (( AUTH_RC != 0 )) || grep -qE 'ACCESS_DENIED|private db access disabled|Invalid email/password|Failed to (log ?in|authenticate)' "$LOG_FILE"; then
+    die "iCloud authentication failed (exit $AUTH_RC). See $LOG_FILE"
 fi
 
 # Run with `caffeinate -dimsu -w $$` in a second terminal to prevent sleep.
 # Do not background this process, the interactive 2FA prompt needs the foreground.
 
-# icloudpd 1.32 prints argument errors and still exits 0, so a bad flag looks
+# icloudpd 1.32 printed argument errors and still exited 0, so a bad flag looked
 # like a clean run that downloaded nothing. Smoke test the args first.
 log "Smoke testing arguments with --dry-run --recent 1"
-SMOKE=$(icloudpd "${ARGS[@]}" --dry-run --recent 1 2>&1) || true
-if grep -qE 'is incorrect|^usage:|unrecognized arguments|No such option' <<<"$SMOKE"; then
-    echo "$SMOKE" | tee -a "$LOG_FILE"
+SMOKE=$(icloudpd "${ARGS[@]}" --dry-run --recent 1 2>&1 < /dev/null) || true
+echo "$SMOKE" >> "$LOG_FILE"
+if grep -qE 'is incorrect|^usage:|unrecognized arguments|No such option|Error: ' <<<"$SMOKE"; then
+    echo "$SMOKE"
     die "icloudpd rejected the arguments. Fix them before starting the real run."
 fi
 if grep -qE 'ACCESS_DENIED|private db access disabled' <<<"$SMOKE"; then
-    echo "$SMOKE" | tee -a "$LOG_FILE"
-    die "iCloud denied private database access. Check that 'Access iCloud Data on the Web' is enabled and Advanced Data Protection is off, then retry."
+    echo "$SMOKE"
+    die "iCloud denied private database access. Enable 'Access iCloud Data on the Web', and either turn Advanced Data Protection off or set ADP_WEB_ACCESS=1, then retry."
 fi
-if grep -qE '^[0-9-]+ [0-9:]+ ERROR' <<<"$SMOKE"; then
-    echo "$SMOKE" | tee -a "$LOG_FILE"
-    die "icloudpd reported an error during the smoke test. Not starting the full run."
+if grep -qE '^[0-9-]+ [0-9:]+ ERROR|Password provider|Two-step|two-factor' <<<"$SMOKE"; then
+    echo "$SMOKE"
+    die "icloudpd reported an error or asked for credentials during the smoke test. Not starting the full run."
 fi
 log "Arguments accepted, API reachable"
+
+# Count lines written by THIS download, not the auth and smoke output above.
+RUN_START_LINE=$(( $(wc -l < "$LOG_FILE") + 1 ))
 
 set +e
 icloudpd "${ARGS[@]}" 2>&1 | tee -a "$LOG_FILE"
@@ -84,20 +99,28 @@ set -e
 
 log "icloudpd exit code: $EXIT_CODE"
 
-if grep -qE 'is incorrect|^usage:|CRITICAL|Failed to download|ACCESS_DENIED|private db access disabled' "$LOG_FILE"; then
+ERR_RE='is incorrect|^usage:|CRITICAL|Failed to download|ACCESS_DENIED|private db access disabled'
+if tail -n +"$RUN_START_LINE" "$LOG_FILE" | grep -qE "$ERR_RE"; then
     log "WARN: error patterns found in the log, treating this run as failed"
-    grep -nE 'is incorrect|^usage:|CRITICAL|Failed to download|ACCESS_DENIED|private db access disabled' "$LOG_FILE" | head -20
+    tail -n +"$RUN_START_LINE" "$LOG_FILE" | grep -nE "$ERR_RE" | head -20
     EXIT_CODE=1
 fi
 
 # Post-run integrity check
 TOTAL_FILES=$(corpus_count "$TARGET_ROOT/originals")
 ZERO_BYTE=$(corpus_count "$TARGET_ROOT/originals" -size 0)
-TOTAL_SIZE_GB=$(du -sg "$TARGET_ROOT/originals" | awk '{print $1}')
+TOTAL_SIZE_GB=$(size_gb "$TARGET_ROOT/originals")
 
 log "Total files: $TOTAL_FILES (was $BEFORE_COUNT before this run)"
 log "Zero-byte files: $ZERO_BYTE"
 log "Total size on disk: ${TOTAL_SIZE_GB} GB"
+
+# Size-suffixed names (IMG_1234-2345678.HEIC) mean icloudpd found a local file
+# whose size no longer matches iCloud, usually because something rewrote it.
+SUFFIXED=$(corpus_count "$TARGET_ROOT/originals" -regex '.*-[0-9][0-9][0-9][0-9]*\.[A-Za-z0-9]*$')
+if (( SUFFIXED > 0 )); then
+    log "NOTE: $SUFFIXED files carry an icloudpd size suffix. Check whether originals were modified after download."
+fi
 
 # Leftovers here mean a run was interrupted mid-download. Re-running clears them.
 PARTIALS=$(find "$TARGET_ROOT/originals" -type f -name '*.part' | wc -l | tr -d ' ')
@@ -115,4 +138,4 @@ if (( ZERO_BYTE > 0 )); then
     log "Re-run this script to attempt re-download of these files"
 fi
 
-exit $EXIT_CODE
+exit "$EXIT_CODE"
