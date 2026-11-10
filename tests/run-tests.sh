@@ -204,6 +204,15 @@ exiftool -q -overwrite_original -Model=ILCE-1 '-DateTimeOriginal=2026:05:11 12:0
 exiftool -q -overwrite_original -Model=ILCE-1M2 '-DateTimeOriginal=2026:06:01 09:00:00' -SubSecTimeOriginal=300 "$M2/DSC00042-691516.JPG"
 exiftool -q -overwrite_original '-Model=iPhone 16 Pro' '-DateTimeOriginal=2024:03:02 08:00:00' -SubSecTimeOriginal=001 "$M1/IMG_0001.JPG"
 cp "$M1/IMG_0002.MOV" "$M2/C0001.MP4"; touch -t 202605121200 "$M2/C0001.MP4"
+# Lightroom desktop exports rewrite the sub-second time. One with no camera
+# name maps to the only frame in that second (tier 3). One naming a frame the
+# catalogue does not hold stays in review (tier 4).
+cp "$M2/Screenshot_0005.PNG" "$M2/AKP-7.PNG"
+exiftool -q -overwrite_original -Model=ILCE-1M2 '-DateTimeOriginal=2026:07:15 18:56:16' -SubSecTimeOriginal=357 '-Software=Adobe Lightroom 9.4.1 (Macintosh)' "$M2/AKP-7.PNG"
+cp "$M2/Screenshot_0005.PNG" "$M2/20260601-_DSC09002.PNG"
+exiftool -q -overwrite_original -Model=ILCE-1M2 '-DateTimeOriginal=2026:06:01 09:00:00' -SubSecTimeOriginal=777 '-Software=Adobe Lightroom 9.6 (Macintosh)' "$M2/20260601-_DSC09002.PNG"
+cp "$M2/Screenshot_0005.PNG" "$M2/20260601-DSC09001-Edit.PNG"
+exiftool -q -overwrite_original -Model=ILCE-1M2 '-DateTimeOriginal=2026:06:01 09:00:00' -SubSecTimeOriginal=888 '-Software=Adobe Lightroom 9.6 (Macintosh)' "$M2/20260601-DSC09001-Edit.PNG"
 python3 - "$WORK/p6/master.lrcat" <<'PYC'
 import sqlite3, sys
 db = sqlite3.connect(sys.argv[1])
@@ -225,6 +234,7 @@ rows = [  # id, base, ext, capture, format, model
   (4,'DSC09000','ARW','2026-06-01T09:00:00.100','RAW',2),
   (5,'DSC09001','ARW','2026-06-01T09:00:00.200','RAW',2),
   (6,'C0001','MP4','2026-05-12T09:00:00','VIDEO',None),
+  (8,'DSC03464','ARW','2026-07-15T18:56:16.758','RAW',2),
 ]
 for i, b, e, c, f, m in rows:
     db.execute("INSERT INTO AgLibraryFile VALUES(?,?,?,1,'',?)", (i, b, e, b + '.' + e))
@@ -248,6 +258,9 @@ check "same name and moment is tier 1" '[[ "$(tier_of "2024-04/IMG_0003 copy.JPG
 check "burst frame missing from catalogue is tier 4" '[[ "$(tier_of 2024-04/DSC00042-691516.JPG)" == 4 ]]'
 check "iPhone photo is tier 5" '[[ "$(tier_of 2024-03/IMG_0001.JPG)" == 5 ]]'
 check "Live Photo video of a new still is tier 5" '[[ "$(tier_of 2024-03/IMG_0001_HEVC.MOV)" == 5 ]]'
+check "Lightroom export with rewritten sub-second maps to the only frame (tier 3)" '[[ "$(tier_of 2024-04/AKP-7.PNG)" == 3 ]]'
+check "export naming a frame missing from the catalogue is tier 4" '[[ "$(tier_of 2024-04/20260601-_DSC09002.PNG)" == 4 ]]'
+check "export naming a catalogue frame in a burst is tier 3" '[[ "$(tier_of 2024-04/20260601-DSC09001-Edit.PNG)" == 3 ]]'
 check "catalogue video with same name and date is tier 2" '[[ "$(tier_of 2024-04/C0001.MP4)" == 2 ]]'
 check "report written" '[[ -s "$T/manifests/06-match-report/index.html" ]]'
 check "EXIF cache written" '[[ -s "$T/manifests/06-exif-cache.json" ]]'

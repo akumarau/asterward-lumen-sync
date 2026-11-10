@@ -87,7 +87,7 @@ Then Add-import the test folder into a **copy** of your catalog and check previe
 
 ## Tests
 
-`tests/run-tests.sh` runs 65 offline checks against a fixture library with a stubbed icloudpd. No Apple account or network needed. On macOS run it under the shell launchd uses:
+`tests/run-tests.sh` runs 68 offline checks against a fixture library with a stubbed icloudpd. No Apple account or network needed. On macOS run it under the shell launchd uses:
 
 ```
 TEST_BASH=/bin/bash tests/run-tests.sh

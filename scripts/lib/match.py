@@ -38,6 +38,8 @@ from datetime import datetime, timedelta
 VIDEO_EXT = {"mov", "mp4", "m4v", "avi", "mts", "m2ts", "3gp"}
 SIZE_SUFFIX = re.compile(r"-[0-9]{3,}$")
 EDITORS = re.compile(r"lightroom|photoshop|camera raw", re.I)
+# Camera file name inside an export name, e.g. 20261017-_DSC4016-Edit -> _DSC4016
+CAMERA_STEM = re.compile(r"(?:^|[^A-Z0-9])(_?DSC[0-9]{4,5}|C[0-9]{4})(?![0-9])")
 TIER_NAMES = {1: "same_file", 2: "same_shot", 3: "edited_export", 4: "review", 5: "new"}
 
 
@@ -170,6 +172,19 @@ def tier_photo(entry, cat):
                 if EDITORS.search(software):
                     return 3, "export of a catalogue photo (%s)" % software.strip(), hit["path"]
                 return 2, "same camera and capture moment", hit["path"]
+            if EDITORS.search(software):
+                # Lightroom desktop and mobile exports rewrite the sub-second
+                # time, so for edited files match on the second and use the
+                # camera file name embedded in the export name, if any.
+                named = CAMERA_STEM.search(stem)
+                if named:
+                    same_stem = [c for c in candidates if c["stem"].lstrip("_") == named.group(1).lstrip("_")]
+                    if same_stem:
+                        return 3, "export of a catalogue photo (%s)" % software.strip(), same_stem[0]["path"]
+                    return 4, "export of %s, which is not in the catalogue (culled frame?)" % named.group(1), candidates[0]["path"]
+                if len(candidates) == 1:
+                    return 3, "export of a catalogue photo, sub-second rewritten (%s)" % software.strip(), candidates[0]["path"]
+                return 4, "export, %d catalogue frames in the same second" % len(candidates), candidates[0]["path"]
             if unknown_ms:
                 return 4, "%d catalogue frames in the same second, no sub-second time to pick one" % len(candidates), candidates[0]["path"]
             return 4, "same second, different frame (burst frame not in catalogue?)", candidates[0]["path"]
