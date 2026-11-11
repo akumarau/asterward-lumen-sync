@@ -95,11 +95,16 @@ log "Arguments accepted, API reachable"
 # The session stays valid, so wait and resume rather than stopping for the
 # night. Waits double from EXTRACT_BACKOFF_MIN up to 2 hours. An expired
 # session or a 2FA request needs a person, so that is never retried.
+# "could not decrypt pcs cookie" appeared mid-run on 11 Nov 2026 while Apple
+# was throttling. It may clear on its own or may need a fresh sign-in, so it
+# gets one retry. A second one stops the run and asks for bin/lumen-sync auth.
 EXTRACT_RETRIES="${EXTRACT_RETRIES:-12}"
 EXTRACT_BACKOFF_MIN="${EXTRACT_BACKOFF_MIN:-15}"
 RETRY_RE='temporary refusing|Service Unavailable|Connection (aborted|reset)|Read timed out|Max retries exceeded|RemoteDisconnected'
 AUTH_RE='Two-step|two-factor|Authentication required|Password provider|Invalid email/password'
+PCS_RE='could not decrypt pcs cookie'
 attempt=1
+pcs_retried=0
 wait_min="$EXTRACT_BACKOFF_MIN"
 while :; do
     # Count lines written by THIS attempt, not the auth, smoke or earlier attempts.
@@ -115,7 +120,18 @@ while :; do
         log "iCloud wants to sign in again. Run: bin/lumen-sync auth, then this script."
         break
     fi
-    if (( attempt >= EXTRACT_RETRIES )) || ! grep -qE "$RETRY_RE" <<<"$SEGMENT"; then
+    retryable=0
+    grep -qE "$RETRY_RE" <<<"$SEGMENT" && retryable=1
+    if grep -qE "$PCS_RE" <<<"$SEGMENT"; then
+        if (( pcs_retried )); then
+            log "iCloud session cookie failed twice. Run: bin/lumen-sync auth, then this script."
+            break
+        fi
+        pcs_retried=1
+        retryable=1
+        log "iCloud session cookie could not be read. Retrying once."
+    fi
+    if (( attempt >= EXTRACT_RETRIES )) || (( ! retryable )); then
         break
     fi
     log "Apple is throttling or the connection dropped. Files so far: $(corpus_count "$TARGET_ROOT/originals"). Waiting $wait_min min, then resuming."

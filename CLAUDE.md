@@ -34,7 +34,7 @@ Moves Anupam's iCloud Photos library into his master Lightroom Classic catalogue
 | 8 | Lightroom import | Anupam does this by hand. Never script the Lightroom UI. |
 | 9 | Reconcile | Read a **copy** of the catalogue with sqlite3 and compare with `manifests/07-copy-new.csv` |
 
-Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any code change. 70 tests, all must pass. Shellcheck is optional.
+Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any code change. 71 tests, all must pass. Shellcheck is optional.
 
 ## Status (10 Nov 2026, evening)
 

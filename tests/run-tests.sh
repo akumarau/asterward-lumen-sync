@@ -142,6 +142,12 @@ if [[ "\${STUB_MODE:-ok}" == "throttle" && " \$* " != *" --dry-run "* && " \$* "
   touch "\$STUB_LOG.throttled"
   echo "2026-11-10 17:41:36 INFO     Apple iCloud is temporary refusing to serve icloudpd"; exit 1
 fi
+if [[ "\${STUB_MODE:-ok}" == pcs* && " \$* " != *" --dry-run "* && " \$* " != *" --auth-only "* ]]; then
+  if [[ "\${STUB_MODE}" == "pcs_always" || ! -f "\$STUB_LOG.pcs" ]]; then
+    touch "\$STUB_LOG.pcs"
+    echo "2026-11-11 10:31:10 ERROR    could not decrypt pcs cookie (INTERNAL_ERROR)"; exit 1
+  fi
+fi
 case " \$* " in
   *" --auth-only "*) echo "Authentication completed successfully"; exit 0 ;;
   *" --dry-run "*) echo "2026-11-10 10:00:00 INFO     Looking up all photos and videos..."; exit 0 ;;
@@ -182,6 +188,16 @@ rm -f "$STUB_LOG.throttled"
 CONFIG_FILE="$CFG" STUB_MODE=throttle EXTRACT_BACKOFF_MIN=0 HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
 check "throttled download waits and resumes, then succeeds" '[[ $rc -eq 0 ]] && grep -q "Waiting 0 min, then resuming" "$WORK/last.out" && grep -q "attempt 2 of" "$WORK/last.out"'
 check "resumed download landed" '[[ -f "$T/originals/2024/2024-05/IMG_0100.JPG" ]]'
+
+new_target p1pcs
+rm -f "$STUB_LOG.pcs"
+CONFIG_FILE="$CFG" STUB_MODE=pcs EXTRACT_BACKOFF_MIN=0 HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "one pcs cookie error is retried, then succeeds" '[[ $rc -eq 0 ]] && grep -q "Retrying once" "$WORK/last.out" && grep -q "attempt 2 of" "$WORK/last.out"'
+
+new_target p1pcs2
+rm -f "$STUB_LOG.pcs"
+CONFIG_FILE="$CFG" STUB_MODE=pcs_always EXTRACT_BACKOFF_MIN=0 HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "a second pcs cookie error stops and asks for auth" '[[ $rc -ne 0 ]] && grep -q "Run: bin/lumen-sync auth" "$WORK/last.out" && ! grep -q "attempt 3 of" "$WORK/last.out"'
 
 new_target p1rec
 CONFIG_FILE="$CFG" RECENT=abc HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" "$SH" "$ROOT/scripts/01-extract.sh" > "$WORK/last.out" 2>&1; rc=$?
