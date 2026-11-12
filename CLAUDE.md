@@ -36,12 +36,16 @@ Moves Anupam's iCloud Photos library into his master Lightroom Classic catalogue
 
 Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any code change. 71 tests, all must pass. Shellcheck is optional.
 
-## Status (10 Nov 2026, evening)
+## Status (12 Nov 2026, evening): Step 2 migration complete
 
-- Step 1 (prove the code) is complete. The test import into a separate catalogue was verified: 232 of 232 files, previews, dates, map, MOV playback and copyright all confirmed.
-- Phase 1 is running in a Terminal tab since 18:45. icloudpd reported 31,935 assets. About 4,400 files and 147 GB were on disk at the restart. Do not start a second extract while it runs.
-- At 18:56 the run was at 4,515 files and 152 GB, about 17 files a minute. Rough finish: evening of 11 Nov, longer if Apple throttles.
-- Next once the extract finishes cleanly: phases 2 to 7 on the live config, stopping after each with a status table. Then hand Anupam the import checklist.
+- Step 1 (prove the code) is complete. The test import into a separate catalogue was verified: 232 of 232 files.
+- Phase 1 finished 11 Nov 14:21 with exit 0: 33,229 files, 742 GB in `originals/`.
+- Phases 2 to 6 passed. Phase 7 copied 32,416 files (780 GB) into `Photo Library` with 0 failures and 0 name collisions.
+- Phase 8 import done 12 Nov. 256 files that were already in `Photo Library` but never catalogued came in with it (listed in `manifests/08-existing-not-in-catalogue.txt`). Anupam removed them from the catalogue (Remove, not delete). They are still on disk.
+- `2026-11-10/Ramya_SilentContract_4K.mp4` was skipped as a duplicate of the copy in `Ramya_Reel`. It was re-imported on its own after `Ramya_Reel` was removed.
+- Phase 9 reconcile passed: catalogue 59,175 photos (26,838 before + 32,337 new). 78 iCloud JPGs are paired with their raw. `2026-07-03/DSC00042.JPG` is not catalogued because its ARW already is. Keyword `iCloud Migration 2026` is on exactly the 32,337 new photos.
+- Pre-import catalogue snapshot (10 Nov state): `~/Pictures/Lightroom/Pre-Import Snapshot 2026-11-10/`. Lightroom backups 8 Nov and 12 Nov sit in the catalogue folder.
+- Optional review: 79 Sony files in tier 5 and 7 in tier 4 (`06-match-report/index.html`), and odd dates in the `2000`, `2011`, `2012` and `2013` folders.
 - Anupam is away 15 Nov to 1 Dec. Do not start `copy-new` or anything long unattended in that window unless he asks. Anything unfinished resumes when he returns.
 
 ## Environment
