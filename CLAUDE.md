@@ -44,7 +44,10 @@ Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any
 - `2026-11-10/Ramya_SilentContract_4K.mp4` was skipped as a duplicate of the copy in `Ramya_Reel`. It was re-imported on its own after `Ramya_Reel` was removed.
 - Phase 9 reconcile passed: catalogue 59,175 photos (26,838 before + 32,337 new). 78 iCloud JPGs are paired with their raw. `2026-07-03/DSC00042.JPG` is not catalogued because its ARW already is. Keyword `iCloud Migration 2026` is on exactly the 32,337 new photos.
 - Pre-import catalogue snapshot (10 Nov state): `~/Pictures/Lightroom/Pre-Import Snapshot 2026-11-10/`. Lightroom backups 8 Nov and 12 Nov sit in the catalogue folder.
-- Optional review: 79 Sony files in tier 5 and 7 in tier 4 (`06-match-report/index.html`), and odd dates in the `2000`, `2011`, `2012` and `2013` folders.
+- Optional review done 13 Nov (catalogue copies only):
+  - Tier 4, 7 files: none are in `Glam_Art` or `Studio`. Each is an export of a burst frame whose neighbours (same second, 33 to 67 ms apart) are in the master. The tier 4 label is correct.
+  - Tier 5 Sony, 79 JPGs: 77 have no raw in any catalogue. 2 are exports of raws kept only in other catalogues: `2026-09/20260906-_DSC9194.JPG` (`_DSC9194.ARW` in `Glam_Art`) and `2026-09/20260916-_DSC0219.JPG` (`Studio Session - 16-9-2026-019.ARW` in `Studio`). Both are now in the master.
+  - Odd dates: `2000-02-16` holds two Nikon D5200 HEICs with the camera year unset. The day and an IST clock fit 16 Feb 2022 about 11:45 AEDT. `2011` and `2012` are Picasa collages with plausible dates. `2013-03-14` holds two Photoshop 25.3 exports with no camera data and the same second, date unproven. Fixing a date is his job in Lightroom (Edit Capture Time).
 - Anupam is away 15 Nov to 1 Dec. Do not start `copy-new` or anything long unattended in that window unless he asks. Anything unfinished resumes when he returns.
 
 ## Environment
@@ -61,7 +64,8 @@ Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any
 
 ## Pending decisions (need Anupam's explicit yes)
 
-- Open question: some tier 4 edits may come from frames kept in `Glam_Art` or `Studio`. `match` checks only the master today.
+- Keep or remove from the master the 2 tier 5 JPGs whose raws live in `Glam_Art` and `Studio` (see Status). He does it in Lightroom if he wants.
+- Before Step 3: `match` reads only the master. `Glam_Art` (101 photos, 6 Sep 2026) and `Studio` (67 photos, 16 Sep to 21 Oct 2026) share no photos with the master, so their exports in iCloud land in tier 5. Decide whether `match` should also read copies of those catalogues.
 
 ## Later (Step 3)
 
@@ -71,8 +75,8 @@ Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any
 ## Decisions already made
 
 - 13 Nov 2026: PR #1 merged to `main` (merge commit `0cdcfba`) and the repo renamed to `akumarau/asterward-lumen-sync`. The old URL redirects. The branch `asterward-lumen-sync` stays as the working branch.
-- 13 Nov 2026: Anupam approved moving the 66 files in `quarantine/duplicates` to the macOS Bin, a one-time exception to hard rule 1. All 66 were re-checked by SHA-256 against their kept twin in `originals/` first. Log: `manifests/03-dedupe-removed.csv`. The Bin on `TOSHIBA_AK` is not emptied. That is his call.
-- 13 Nov 2026: Anupam approved removing the Step 1 test area `/Volumes/TOSHIBA_AK/LumenSync_Test` (7.3 GB) and the test catalogue `~/Pictures/Lightroom/LumenSync_Test` (282 MB). Both were moved to the Bin, not emptied. A catalogue copy showed the master had no folders there. `config/sample.env` stays in the repo.
+- 13 Nov 2026: Anupam approved moving the 66 files in `quarantine/duplicates` to the macOS Bin, a one-time exception to hard rule 1. All 66 were re-checked by SHA-256 against their kept twin in `originals/` first. Log: `manifests/03-dedupe-removed.csv`. Both Bins were emptied on 13 Nov at about 20:35, not by Claude.
+- 13 Nov 2026: Anupam approved removing the Step 1 test area `/Volumes/TOSHIBA_AK/LumenSync_Test` (7.3 GB) and the test catalogue `~/Pictures/Lightroom/LumenSync_Test` (282 MB). Both were moved to the Bin, since emptied. A catalogue copy showed the master had no folders there. `config/sample.env` stays in the repo.
 - Option A: `originals` stays a pure icloudpd mirror. New files are copied, never moved.
 - Tier 4 (edits of frames culled from the catalogue) is imported, as well as tier 5.
 - `--set-exif-datetime` stays on, for consistency with files downloaded in August.
