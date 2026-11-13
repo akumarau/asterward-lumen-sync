@@ -2,6 +2,7 @@
 config/migration.env
 
 # Generated from the .template, contains absolute home paths
+config/com.asterward.lumensync.plist
 config/com.icloudsync.plist
 
 # IDE

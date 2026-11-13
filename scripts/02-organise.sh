@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 02-organise.sh
+# Asterward Lumen Sync, Phase 2.
 # Verify canonical YYYY/YYYY-MM structure. Optionally separate Live Photo MOVs.
 # Set KEEP_LIVE_PHOTO_MOVS=0 to move MOVs into a separate live_photos/ tree.
 
@@ -46,12 +47,16 @@ if [[ "$KEEP_LIVE_PHOTO_MOVS" == "0" ]]; then
         stem="${base%.*}"
         stem="${stem%_HEVC}"
 
-        companions=("$parent/$stem".heic "$parent/$stem".heif "$parent/$stem".jpg "$parent/$stem".jpeg)
+        # The patterns MUST contain a wildcard. nullglob and nocaseglob only act
+        # on glob patterns, so a literal "$stem".heic stays in the array even
+        # when no such file exists, and every standalone video was being moved.
+        # .hei[cf] covers HEIC/HEIF, .jp*g covers JPG/JPEG, in any case.
+        companions=("$parent/$stem".hei[cf] "$parent/$stem".jp*g)
         if (( ${#companions[@]} > 0 )); then
             dest="$LIVE_ROOT/$rel"
             mkdir -p "$(dirname "$dest")"
             mv "$mov" "$dest"
-            echo "move_live_mov,\"$mov\",\"$dest\",$(ts)" >> "$MANIFEST"
+            printf 'move_live_mov,"%s","%s",%s\n' "${mov//\"/\"\"}" "${dest//\"/\"\"}" "$(ts)" >> "$MANIFEST"
         fi
     done < <(corpus_find "$TARGET_ROOT/originals" -iname '*.mov')
 

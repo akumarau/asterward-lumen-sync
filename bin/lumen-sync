@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# lumen-sync
+# Asterward Lumen Sync command line entry point.
+# Thin dispatcher over the phase scripts, so the operator, an agent, and launchd
+# all run exactly the same code.
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$BIN_DIR/.." && pwd)"
+SCRIPTS="$PROJECT_ROOT/scripts"
+VERSION="0.3.0"
+LABEL="com.asterward.lumensync"
+
+usage() {
+    cat <<EOF
+Asterward Lumen Sync $VERSION
+Move an iCloud Photos library into a Lightroom Classic ready folder tree.
+
+Usage: lumen-sync <command>
+
+Commands
+  prereqs           Phase 0. Write config, install tools, create folders
+  auth              Renew the cached iCloud session (password and 2FA)
+  extract           Phase 1. Download originals. RECENT=100 for a sample run
+  organise          Phase 2. Check folder layout, optional Live Photo split
+  dedupe            Phase 3. Move exact duplicates to quarantine
+  metadata          Phase 4. Write .xmp sidecars for raw files
+  validate          Phase 5. Integrity sample and report
+  match             Phase 6. Tier iCloud files against the master catalogue
+  copy-new          Phase 7. Copy new files into the master library tree
+  delta             Monthly delta sync (what launchd runs)
+  status            Counts, disk use and the latest validation verdict
+  install-schedule  Generate and load the monthly launchd job
+  help              Show this help
+  version           Show the version
+
+Config: config/migration.env (override with CONFIG_FILE=/path/to/file)
+EOF
+}
+
+run() { exec bash "$SCRIPTS/$1"; }
+
+cmd="${1:-help}"
+case "$cmd" in
+    prereqs)  run 00-prereqs.sh ;;
+    extract)  run 01-extract.sh ;;
+    organise|organize) run 02-organise.sh ;;
+    dedupe)   run 03-dedupe.sh ;;
+    metadata) run 04-generate-xmp.sh ;;
+    validate) run 05-validate.sh ;;
+    match)    run 06-match.sh ;;
+    copy-new) run 07-copy-new.sh ;;
+    delta)    run 99-delta-sync.sh ;;
+    auth)
+        # shellcheck source=../scripts/lib/common.sh
+        source "$SCRIPTS/lib/common.sh"
+        : "${APPLE_ID:?ERROR: run lumen-sync prereqs first}"
+        export PATH="$PATH:$HOME/.local/bin"
+        require_mount
+        args=(--username "$APPLE_ID" --directory "$TARGET_ROOT/originals"
+              --cookie-directory "$TARGET_ROOT/.icloudpd-cache" --auth-only)
+        [[ "$ADP_WEB_ACCESS" == "1" ]] && args+=(--adp-web-access)
+        exec icloudpd "${args[@]}"
+        ;;
+    status)
+        # shellcheck source=../scripts/lib/common.sh
+        source "$SCRIPTS/lib/common.sh"
+        require_mount
+        printf '%-28s %s\n' "Target" "$TARGET_ROOT"
+        printf '%-28s %s\n' "Filesystem" "$(detect_fs)"
+        printf '%-28s %s GB\n' "Free space" "$(free_gb "$TARGET_ROOT")"
+        if [[ -d "$TARGET_ROOT/originals" ]]; then
+            printf '%-28s %s\n' "Files in originals/" "$(corpus_count "$TARGET_ROOT/originals" ! -iname '*.xmp')"
+            printf '%-28s %s\n' "XMP sidecars" "$(corpus_count "$TARGET_ROOT/originals" -iname '*.xmp')"
+            printf '%-28s %s GB\n' "Size of originals/" "$(size_gb "$TARGET_ROOT/originals")"
+        fi
+        if [[ -d "$TARGET_ROOT/quarantine" ]]; then
+            printf '%-28s %s\n' "Files in quarantine/" "$(corpus_count "$TARGET_ROOT/quarantine")"
+        fi
+        if [[ -f "$TARGET_ROOT/manifests/05-validation-report.md" ]]; then
+            printf '%-28s %s\n' "Last validation" "$(tail -n 1 "$TARGET_ROOT/manifests/05-validation-report.md")"
+        fi
+        if [[ -f "$TARGET_ROOT/.last-delta" ]]; then
+            printf '%-28s %s\n' "Last delta sync" "$(date -r "$TARGET_ROOT/.last-delta" 2>/dev/null || echo present)"
+        fi
+        ;;
+    install-schedule)
+        # shellcheck source=../scripts/lib/common.sh
+        source "$SCRIPTS/lib/common.sh"
+        [[ "$(uname -s)" == "Darwin" ]] || { echo "install-schedule needs macOS launchd"; exit 1; }
+        out="$PROJECT_ROOT/config/$LABEL.plist"
+        sed -e "s|__PROJECT_DIR__|$PROJECT_ROOT|g" -e "s|__HOME__|$HOME|g" \
+            -e "s|__TARGET_ROOT__|$TARGET_ROOT|g" \
+            "$PROJECT_ROOT/config/$LABEL.plist.template" > "$out"
+        plutil -lint "$out"
+        dest="$HOME/Library/LaunchAgents/$LABEL.plist"
+        mkdir -p "$HOME/Library/LaunchAgents"
+        cp "$out" "$dest"
+        launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+        launchctl bootstrap "gui/$(id -u)" "$dest"
+        launchctl print "gui/$(id -u)/$LABEL" | head -n 5
+        echo "Loaded $LABEL. It runs on the 1st of each month at 02:00."
+        ;;
+    version|--version|-V) echo "Asterward Lumen Sync $VERSION" ;;
+    help|--help|-h) usage ;;
+    *) echo "Unknown command: $cmd" >&2; usage >&2; exit 2 ;;
+esac

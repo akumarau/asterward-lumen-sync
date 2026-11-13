@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 03-dedupe.sh
+# Asterward Lumen Sync, Phase 3.
 # Identify true content duplicates via fdupes, confirm with SHA-256, move to quarantine.
 # Never deletes. User can inspect quarantine and delete manually after review.
 
@@ -26,9 +27,9 @@ fdupes -r "$TARGET_ROOT/originals" > "$RAW_LIST" 2>>"$LOG_FILE" || true
 DUPE_GROUPS=$(awk 'BEGIN{c=0} /^$/{c++} END{print c}' "$RAW_LIST")
 log "Identified $DUPE_GROUPS candidate duplicate groups"
 
-# For each duplicate group, keep the first file (typically the oldest folder), move the rest.
+# For each duplicate group, keep the plain-named copy icloudpd expects, move the rest.
 python3 - "$RAW_LIST" "$QUARANTINE" "$MANIFEST" "$TARGET_ROOT" 2>&1 <<'PY' | tee -a "$LOG_FILE"
-import sys, os, csv, shutil, hashlib
+import sys, os, re, csv, shutil, hashlib
 from datetime import datetime, timezone
 
 raw, quarantine, manifest, root = sys.argv[1:5]
@@ -38,6 +39,14 @@ originals = os.path.join(root, "originals")
 def is_junk(path):
     name = os.path.basename(path)
     return name.startswith("._") or name in {".DS_Store", ".localized"}
+
+
+SIZE_SUFFIX = re.compile(r"-[0-9]{3,}$")
+
+
+def keeper_rank(path):
+    stem = os.path.splitext(os.path.basename(path))[0]
+    return (1 if SIZE_SUFFIX.search(stem) else 0, len(os.path.basename(path)), path)
 
 
 def sha256(path, buf=1024 * 1024):
@@ -73,6 +82,11 @@ with open(manifest, "a", newline="", encoding="utf-8") as fh:
             skipped += 1
             continue
 
+        # Keep the copy icloudpd will look for next time: the plain name, not a
+        # "-<bytes>" suffixed one. icloudpd checks the plain name first. If the
+        # plain file were quarantined, every later extract or delta run would
+        # download it again, and this phase would move it again, forever.
+        files.sort(key=keeper_rank)
         keeper = files[0]
         digest = sha256(keeper)
         size = os.path.getsize(keeper)
@@ -101,6 +115,6 @@ PY
 
 AFTER=$(corpus_count "$TARGET_ROOT/originals")
 MOVED=$(( BEFORE - AFTER ))
-RECLAIMED_MB=$(du -sm "$QUARANTINE" | awk '{print $1}')
+RECLAIMED_MB=$(size_mb "$QUARANTINE")
 log "originals/ went from $BEFORE to $AFTER files"
 log "Moved $MOVED duplicates to quarantine, ${RECLAIMED_MB} MB reclaimable after your review"

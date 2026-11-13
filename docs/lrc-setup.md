@@ -1,4 +1,4 @@
-# Lightroom Classic Setup
+# Lightroom Classic Setup for Asterward Lumen Sync
 
 Images live on `/Volumes/TOSHIBA_AK`. The catalog must not.
 
@@ -24,11 +24,11 @@ Do this once, after `05-validate.sh` passes.
 
 1. Open Lightroom Classic. Confirm the SSD-hosted catalog is open.
 2. File > Import Photos and Video (or Cmd+Shift+I).
-3. Source panel (left): navigate to `/Volumes/TOSHIBA_AK/iCloud_Import/originals/`. Tick "Include Subfolders".
+3. Source panel (left): navigate to `/Volumes/TOSHIBA_AK/iCloud_Import/originals/`. Tick "Include Subfolders". Select `originals/` itself, never `iCloud_Import/`: from the parent, Include Subfolders also imports `quarantine/`, and its duplicates land in the catalogue. (Seen in the Step 1 test import.)
 4. Top bar: select **Add**. This leaves files in place and only adds catalog entries.
 5. Right panel:
    - **File Handling**: Build Previews = Standard, Build Smart Previews = off, Do Not Import Suspected Duplicates = on.
-   - **Apply During Import > Metadata**: None. Phase 4 already wrote copyright into the raw sidecars and into the HEIC/JPEG files themselves.
+   - **Apply During Import > Metadata**: choose a copyright preset. Create it once via Metadata > New: Creator, Copyright, Copyright Status = Copyrighted, Rights Usage Terms, Copyright Info URL. Save it as `Asterward Copyright`. This covers HEIC, JPEG, PNG and DNG, which ignore sidecars, without modifying the originals. Raw files also carry the same fields in their Phase 4 sidecars.
    - **Apply During Import > Keywords**: `iCloud Migration, 2026` (optional, useful for later filtering).
    - **Destination**: not applicable in Add mode.
 6. Click Import.
@@ -39,7 +39,9 @@ For 850 GB, expect the initial import to take 3 to 6 hours depending on catalog 
 
 The delta sync drops new phone captures into `originals/YYYY/YYYY-MM/`. Two ways to get them into the catalog.
 
-**Pattern B, recommended.** Skip Auto Import entirely. After each monthly delta sync, run File > Import, source `/Volumes/TOSHIBA_AK/iCloud_Import/originals/` with Include Subfolders on, Add mode, Do Not Import Suspected Duplicates on. Takes two minutes and cannot go wrong.
+**Pattern B, recommended.** Skip Auto Import entirely. After each monthly delta sync, run File > Import, source `/Volumes/TOSHIBA_AK/iCloud_Import/originals/` with Include Subfolders on, Add mode, Do Not Import Suspected Duplicates on, and the `Asterward Copyright` metadata preset. Takes two minutes and cannot go wrong.
+
+Keep **Catalog Settings > Metadata > Automatically write changes into XMP** OFF for this folder tree. With it on, LRC writes edits into HEIC, JPEG and DNG files, which changes their size and makes the next delta sync download them again.
 
 **Pattern A, only if you want daily automation.** LRC's Watched Folder does not recurse, so it cannot watch the dated tree directly. You would point it at a flat staging folder such as `/Volumes/TOSHIBA_AK/iCloud_Import/watch_inbox/`, modify `99-delta-sync.sh` to move new files there, and set Move To plus Subfolder `{yyyy}/{yyyy}-{MM}` so LRC files them. That is an extra moving step on a drive that is already the slow link, for a monthly cadence. Not worth it.
 

@@ -2,21 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
         "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Template. Generate the real plist with your own paths:
-
-    sed -e "s|__PROJECT_DIR__|$PWD|g" -e "s|__HOME__|$HOME|g" \
-        -e "s|__TARGET_ROOT__|/Volumes/YOUR_DRIVE/iCloud_Import|g" \
-        config/com.icloudsync.plist.template > config/com.icloudsync.plist
-
-    cp config/com.icloudsync.plist ~/Library/LaunchAgents/
-    launchctl load ~/Library/LaunchAgents/com.icloudsync.plist
+  Asterward Lumen Sync, monthly delta sync job. Template.
+  Install with:   bin/lumen-sync install-schedule
+  That fills in your paths, lints the plist, and loads it with launchctl.
 
   The generated file is gitignored because it contains absolute home paths.
+  If the older com.icloudsync job is installed, remove it first:
+    launchctl bootout gui/$(id -u)/com.icloudsync
+    rm ~/Library/LaunchAgents/com.icloudsync.plist
+
+  macOS privacy: the first run writes to an external volume, so macOS may ask
+  to allow /bin/bash access to Removable Volumes. launchd cannot answer that
+  prompt. Run `bin/lumen-sync delta` once from Terminal to grant it.
 -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.icloudsync</string>
+    <string>com.asterward.lumensync</string>
 
     <key>ProgramArguments</key>
     <array>
@@ -45,10 +47,10 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>__TARGET_ROOT__/logs/launchd-stdout.log</string>
+    <string>__TARGET_ROOT__/logs/lumensync-launchd-stdout.log</string>
 
     <key>StandardErrorPath</key>
-    <string>__TARGET_ROOT__/logs/launchd-stderr.log</string>
+    <string>__TARGET_ROOT__/logs/lumensync-launchd-stderr.log</string>
 
     <!-- launchd has no drive-presence key. 99-delta-sync.sh calls require_mount
          and exits non-zero if the target volume is not attached. -->

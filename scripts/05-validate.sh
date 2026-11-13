@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 05-validate.sh
+# Asterward Lumen Sync, Phase 5.
 # Final integrity sweep before LRC import.
 # Random 1% sample gets exiftool verification. Full corpus gets file-count and zero-byte checks.
 
@@ -12,7 +13,7 @@ REPORT="$TARGET_ROOT/manifests/05-validation-report.md"
 
 TOTAL_FILES=$(corpus_count "$TARGET_ROOT/originals" ! -iname '*.xmp')
 TOTAL_XMP=$(corpus_count "$TARGET_ROOT/originals" -iname '*.xmp')
-TOTAL_SIZE_GB=$(du -sg "$TARGET_ROOT/originals" | awk '{print $1}')
+TOTAL_SIZE_GB=$(size_gb "$TARGET_ROOT/originals")
 ZERO_BYTE=$(corpus_count "$TARGET_ROOT/originals" ! -iname '*.xmp' -size 0)
 JUNK=$(find "$TARGET_ROOT/originals" -type f \( -name '._*' -o -name '.DS_Store' \) | wc -l | tr -d ' ')
 
