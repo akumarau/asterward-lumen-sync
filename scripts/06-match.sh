@@ -12,6 +12,9 @@
 #   Tier 5 new            copied by Phase 7
 #
 # Config: MASTER_LRCAT=/path/to/Catalog.lrcat in config/migration.env.
+# Optional: EXTRA_LRCATS=/path/A.lrcat:/path/B.lrcat for other catalogues that
+# also hold photos. A plain copy of one of their photos is skipped. An edited
+# export of one goes to tier 4, so the edit is still copied into the master.
 # Output: manifests/06-match.csv and manifests/06-match-report/index.html
 
 set -euo pipefail
@@ -20,6 +23,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 require_mount
 : "${MASTER_LRCAT:?Set MASTER_LRCAT in $CONFIG_FILE to your master catalogue .lrcat path}"
 [[ -f "$MASTER_LRCAT" ]] || die "Catalogue not found: $MASTER_LRCAT"
+EXTRAS=()
+if [[ -n "${EXTRA_LRCATS:-}" ]]; then
+    IFS=':' read -r -a EXTRAS <<< "$EXTRA_LRCATS"
+    for x in "${EXTRAS[@]}"; do
+        [[ -f "$x" ]] || die "Extra catalogue not found: $x"
+    done
+fi
 MATCH_THUMBS="${MATCH_THUMBS:-1}"
 
 LOG_FILE="$TARGET_ROOT/logs/06-match-$(date -u +%Y%m%dT%H%M%SZ).log"
@@ -36,6 +46,15 @@ log "Copying catalogue snapshot: $MASTER_LRCAT"
 cp "$MASTER_LRCAT" "$WORK/catalog.lrcat"
 [[ -f "$MASTER_LRCAT-wal" ]] && cp "$MASTER_LRCAT-wal" "$WORK/catalog.lrcat-wal"
 [[ -f "${MASTER_LRCAT%.lrcat}.lrcat.lock" ]] && log "NOTE: Lightroom has this catalogue open. The snapshot may miss changes made in the last few seconds."
+EXTRA_ARGS=()
+n=0
+for x in ${EXTRAS[@]+"${EXTRAS[@]}"}; do
+    n=$((n + 1))
+    log "Copying extra catalogue snapshot: $x"
+    cp "$x" "$WORK/extra$n.lrcat"
+    [[ -f "$x-wal" ]] && cp "$x-wal" "$WORK/extra$n.lrcat-wal"
+    EXTRA_ARGS+=("$(basename "$x" .lrcat)=$WORK/extra$n.lrcat")
+done
 
 # ---------------------------------------------------------------------------
 # 2. EXIF for every iCloud file, read once and cached. Later runs only read
@@ -59,7 +78,7 @@ python3 "$PY" exif-merge "$WORK/files.bin" "$CACHE" "$WORK/new.json" > /dev/null
 # 3. Tier
 # ---------------------------------------------------------------------------
 python3 "$PY" match "$TARGET_ROOT/originals" "$WORK/catalog.lrcat" "$CACHE" "$MAN/06-match.csv" \
-    | tee -a "$LOG_FILE"
+    ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} | tee -a "$LOG_FILE"
 
 # ---------------------------------------------------------------------------
 # 4. Report, with thumbnails for tiers 1 to 4 (capped) so a person can check

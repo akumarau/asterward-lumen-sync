@@ -28,12 +28,12 @@ Moves Anupam's iCloud Photos library into his master Lightroom Classic catalogue
 | 3 | `bin/lumen-sync dedupe` | Moves exact copies to `quarantine/duplicates`, keeps the plain name |
 | 4 | `bin/lumen-sync metadata` | Writes `.xmp` sidecars for ARW only. Never modifies originals. |
 | 5 | `bin/lumen-sync validate` | Integrity sample, must report PASS |
-| 6 | `bin/lumen-sync match` | Tiers every file against a catalogue snapshot. Report: `iCloud_Import/manifests/06-match-report/index.html` |
+| 6 | `bin/lumen-sync match` | Tiers every file against snapshots of the master and of `EXTRA_LRCATS` (`Glam_Art`, `Studio`). Report: `iCloud_Import/manifests/06-match-report/index.html` |
 | 7 | `bin/lumen-sync copy-new` | Copies tiers 4 and 5 (`COPY_TIERS=4,5`) to the destination library. Refuses until a full extract pass finished. |
 | 8 | Lightroom import | Anupam does this by hand. Never script the Lightroom UI. |
 | 9 | Reconcile | Read a **copy** of the catalogue with sqlite3 and compare with `manifests/07-copy-new.csv` |
 
-Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any code change. 71 tests, all must pass. Shellcheck is optional.
+Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any code change. 79 tests, all must pass. Shellcheck is optional.
 
 ## Status (12 Nov 2026, evening): Step 2 migration complete
 
@@ -46,7 +46,7 @@ Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any
 - Pre-import catalogue snapshot (10 Nov state): `~/Pictures/Lightroom/Pre-Import Snapshot 2026-11-10/`. Lightroom backups 8 Nov and 12 Nov sit in the catalogue folder.
 - Optional review done 13 Nov (catalogue copies only):
   - Tier 4, 7 files: none are in `Glam_Art` or `Studio`. Each is an export of a burst frame whose neighbours (same second, 33 to 67 ms apart) are in the master. The tier 4 label is correct.
-  - Tier 5 Sony, 79 JPGs: 77 have no raw in any catalogue. 2 are exports of raws kept only in other catalogues: `2026-09/20260906-_DSC9194.JPG` (`_DSC9194.ARW` in `Glam_Art`) and `2026-09/20260916-_DSC0219.JPG` (`Studio Session - 16-9-2026-019.ARW` in `Studio`). Both are now in the master.
+  - Tier 5 Sony, 79 JPGs: 77 have no raw in any catalogue. 2 are exports of raws kept only in other catalogues: `2026-09/20260906-_DSC9194.JPG` (`_DSC9194.ARW` in `Glam_Art`) and `2026-09/20260916-_DSC0219.JPG` (`Studio Session - 16-9-2026-019.ARW` in `Studio`). Anupam removed `_DSC9194` from the master on 13 Nov (Remove, file still on disk, master now 59,174) and kept `_DSC0219`.
   - Odd dates: `2000-02-16` holds two Nikon D5200 HEICs with the camera year unset. The day and an IST clock fit 16 Feb 2022 about 11:45 AEDT. `2011` and `2012` are Picasa collages with plausible dates. `2013-03-14` holds two Photoshop 25.3 exports with no camera data and the same second, date unproven. Fixing a date is his job in Lightroom (Edit Capture Time).
 - Anupam is away 15 Nov to 1 Dec. Do not start `copy-new` or anything long unattended in that window unless he asks. Anything unfinished resumes when he returns.
 
@@ -64,19 +64,20 @@ Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any
 
 ## Pending decisions (need Anupam's explicit yes)
 
-- Keep or remove from the master the 2 tier 5 JPGs whose raws live in `Glam_Art` and `Studio` (see Status). He does it in Lightroom if he wants.
-- Before Step 3: `match` reads only the master. `Glam_Art` (101 photos, 6 Sep 2026) and `Studio` (67 photos, 16 Sep to 21 Oct 2026) share no photos with the master, so their exports in iCloud land in tier 5. Decide whether `match` should also read copies of those catalogues.
+- None open. Merging the branch to `main` still needs his yes each time. The auto mode safety check blocked a `gh pr merge` on 13 Nov, so he runs it himself or adds a permission rule.
 
 ## Later (Step 3)
 
 - Monthly delta sync with `bin/lumen-sync install-schedule` (launchd label `com.asterward.lumensync`). The first run from Terminal grants macOS access to the external drive.
 - Each month: delta, then `match`, then `copy-new`, then a small Add import. Scope it with him first.
+- A real-data `match` on 13 Nov (scratchpad only, `06-match.csv` untouched) put 1,611 files in tier 4, mostly migration files now in the master that match only loosely (same name and day, burst neighbours). `copy-new` skips them as "done earlier" via `07-copy-new.csv`, but they swamp the tier 4 report. Consider hiding rows already in `07-copy-new.csv` from the report before the first monthly run.
 
 ## Decisions already made
 
 - 13 Nov 2026: PR #1 merged to `main` (merge commit `0cdcfba`) and the repo renamed to `akumarau/asterward-lumen-sync`. The old URL redirects. The branch `asterward-lumen-sync` stays as the working branch.
 - 13 Nov 2026: Anupam approved moving the 66 files in `quarantine/duplicates` to the macOS Bin, a one-time exception to hard rule 1. All 66 were re-checked by SHA-256 against their kept twin in `originals/` first. Log: `manifests/03-dedupe-removed.csv`. Both Bins were emptied on 13 Nov at about 20:35, not by Claude.
 - 13 Nov 2026: Anupam approved removing the Step 1 test area `/Volumes/TOSHIBA_AK/LumenSync_Test` (7.3 GB) and the test catalogue `~/Pictures/Lightroom/LumenSync_Test` (282 MB). Both were moved to the Bin, since emptied. A catalogue copy showed the master had no folders there. `config/sample.env` stays in the repo.
+- 13 Nov 2026: `match` also reads `Glam_Art` and `Studio` (`EXTRA_LRCATS` in `migration.env`). A plain copy of one of their photos is skipped (tier 1 or 2). An edited export of one goes to tier 4, so the edit still reaches the master. Anupam chose this because he keeps such edits, for example `20260916-_DSC0219.JPG`.
 - Option A: `originals` stays a pure icloudpd mirror. New files are copied, never moved.
 - Tier 4 (edits of frames culled from the catalogue) is imported, as well as tier 5.
 - `--set-exif-datetime` stays on, for consistency with files downloaded in August.

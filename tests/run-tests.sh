@@ -314,6 +314,51 @@ CONFIG_FILE="$CFG" FORCE=1 "$SH" "$ROOT/scripts/07-copy-new.sh" > "$WORK/last.ou
 check "copy re-run copies nothing new" '[[ $rc -eq 0 && $(find "$LIB" -type f | wc -l | tr -d " ") -eq $n1 ]] && grep -q "Copied: 0" "$WORK/last.out"'
 
 # ---------------------------------------------------------------------------
+echo "== Phase 6: extra catalogues"
+# Two frames held only in another catalogue: a camera JPEG of one (skip) and a
+# Lightroom export of the other, with the sub-second rewritten (review, copied).
+M3="$O/2026/2026-08"; mkdir -p "$M3"
+cp "$M1/IMG_0001.JPG" "$M3/DSC07001.JPG"
+exiftool -q -overwrite_original -Model=ILCE-1 '-DateTimeOriginal=2026:08:01 10:00:00' -SubSecTimeOriginal=250 "$M3/DSC07001.JPG"
+cp "$M1/IMG_0001.JPG" "$M3/20260801-DSC07002.JPG"
+exiftool -q -overwrite_original -Model=ILCE-1 '-DateTimeOriginal=2026:08:01 10:00:01' -SubSecTimeOriginal=999 '-Software=Adobe Lightroom 9.6 (Macintosh)' "$M3/20260801-DSC07002.JPG"
+python3 - "$WORK/p6/Studio.lrcat" <<'PYC'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.executescript("""
+CREATE TABLE AgLibraryRootFolder(id_local INTEGER PRIMARY KEY, absolutePath TEXT);
+CREATE TABLE AgLibraryFolder(id_local INTEGER PRIMARY KEY, pathFromRoot TEXT, rootFolder INTEGER);
+CREATE TABLE AgLibraryFile(id_local INTEGER PRIMARY KEY, baseName TEXT, extension TEXT, folder INTEGER, sidecarExtensions TEXT, originalFilename TEXT);
+CREATE TABLE Adobe_images(id_local INTEGER PRIMARY KEY, rootFile INTEGER, captureTime TEXT, fileFormat TEXT, masterImage INTEGER);
+CREATE TABLE AgInternedExifCameraModel(id_local INTEGER PRIMARY KEY, value TEXT);
+CREATE TABLE AgHarvestedExifMetadata(id_local INTEGER PRIMARY KEY, image INTEGER, cameraModelRef INTEGER);
+INSERT INTO AgLibraryRootFolder VALUES(1,'/Volumes/X/Studio/');
+INSERT INTO AgLibraryFolder VALUES(1,'2026-08-01/',1);
+INSERT INTO AgInternedExifCameraModel VALUES(1,'ILCE-1');
+INSERT INTO AgLibraryFile VALUES(1,'DSC07001','ARW',1,'','DSC07001.ARW'),(2,'DSC07002','ARW',1,'','DSC07002.ARW');
+INSERT INTO Adobe_images VALUES(1,1,'2026-08-01T10:00:00.250','RAW',NULL),(2,2,'2026-08-01T10:00:01.400','RAW',NULL);
+INSERT INTO AgHarvestedExifMetadata VALUES(1,1,1),(2,2,1);
+""")
+db.commit()
+PYC
+phase 06-match.sh; cp "$MC" "$WORK/p6/plain.csv"
+check "without extra catalogues their frames are tier 5" '[[ "$(tier_of 2026-08/DSC07001.JPG)" == 5 && "$(tier_of 2026-08/20260801-DSC07002.JPG)" == 5 ]]'
+{ cat "$CFG"; echo 'EXTRA_LRCATS='; } > "$CFG.empty"
+CONFIG_FILE="$CFG.empty" "$SH" "$ROOT/scripts/06-match.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "empty EXTRA_LRCATS changes nothing" '[[ $rc -eq 0 ]] && cmp -s "$MC" "$WORK/p6/plain.csv"'
+{ cat "$CFG"; printf 'EXTRA_LRCATS=%q\n' "$WORK/p6/nope.lrcat"; } > "$CFG.missing"
+CONFIG_FILE="$CFG.missing" "$SH" "$ROOT/scripts/06-match.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "missing extra catalogue stops match" '[[ $rc -ne 0 ]] && grep -q "Extra catalogue not found" "$WORK/last.out" && cmp -s "$MC" "$WORK/p6/plain.csv"'
+studio_sum="$(cksum < "$WORK/p6/Studio.lrcat")"
+{ cat "$CFG"; printf 'EXTRA_LRCATS=%q\n' "$WORK/p6/Studio.lrcat"; } > "$CFG.extra"
+CONFIG_FILE="$CFG.extra" "$SH" "$ROOT/scripts/06-match.sh" > "$WORK/last.out" 2>&1; rc=$?
+check "match with an extra catalogue exits 0" '[[ $rc -eq 0 ]] && grep -q "Extra catalogue Studio: 2" "$WORK/last.out"'
+check "camera JPEG of a frame in an extra catalogue is skipped (tier 2)" '[[ "$(tier_of 2026-08/DSC07001.JPG)" == 2 ]] && grep "DSC07001.JPG" "$MC" | grep -q "(in Studio)"'
+check "edited export of a frame in an extra catalogue is review (tier 4)" '[[ "$(tier_of 2026-08/20260801-DSC07002.JPG)" == 4 ]] && grep "20260801-DSC07002.JPG" "$MC" | grep -q "photo in Studio"'
+check "master matches are unchanged by an extra catalogue" '[[ "$(tier_of 2024-03/IMG_0003.JPG)" == 3 && "$(tier_of 2024-03/IMG_0001.JPG)" == 5 ]]'
+check "extra catalogue is never modified" '[[ "$studio_sum" == "$(cksum < "$WORK/p6/Studio.lrcat")" ]]'
+
+# ---------------------------------------------------------------------------
 echo "== CLI"
 out="$("$SH" "$ROOT/bin/lumen-sync" help)"
 check "lumen-sync help names the product" 'grep -q "Asterward Lumen Sync" <<<"$out"'

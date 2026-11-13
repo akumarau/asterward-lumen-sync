@@ -6,8 +6,11 @@ data that exiftool wrote as JSON. Never writes to the catalogue and never
 touches files under originals/.
 
 Subcommands
-  match   ORIGINALS LRCAT EXIF_JSON OUT_CSV
-          Tier every iCloud file against the catalogue.
+  match   ORIGINALS LRCAT EXIF_JSON OUT_CSV [LABEL=EXTRA_LRCAT ...]
+          Tier every iCloud file against the catalogue. Extra catalogues
+          count as already holding a photo, except that an edited export of
+          one of their photos goes to tier 4 so the edit still reaches the
+          master.
   report  MATCH_CSV OUT_DIR
           Write a local HTML page summarising the tiers (thumbnails are added
           by the shell wrapper, which owns exiftool).
@@ -94,7 +97,7 @@ def ext_of(name):
 # ---------------------------------------------------------------------------
 # Catalogue index
 # ---------------------------------------------------------------------------
-def load_catalogue(lrcat):
+def load_catalogue(lrcat, source=""):
     db = sqlite3.connect("file:%s?mode=ro" % lrcat, uri=True)
     rows = db.execute(
         """
@@ -123,6 +126,7 @@ def load_catalogue(lrcat):
             "ms": ms,
             "model": norm_model(model),
             "format": fmt,
+            "source": source,
         }
         if sec and rec["model"]:
             by_shot[(rec["model"], sec)].append(rec)
@@ -134,6 +138,37 @@ def load_catalogue(lrcat):
         if fmt == "VIDEO" or rec["ext"] in VIDEO_EXT:
             videos_by_stem[rec["stem"]].append(rec)
     return {"by_shot": by_shot, "by_name": by_name, "videos": videos_by_stem, "count": len(rows)}
+
+
+def load_catalogues(master, extras):
+    """Master first, so its records win when a frame is in more than one.
+    extras is a list of (label, path). Returns the merged index and a map
+    from each extra record's path to its label."""
+    cat = load_catalogue(master)
+    cat["extra_count"] = {}
+    source_of = {}
+    in_master = {r["path"] for recs in cat["by_name"].values() for r in recs}
+    for label, path in extras:
+        more = load_catalogue(path, label)
+        for key in ("by_shot", "by_name", "videos"):
+            for k, recs in more[key].items():
+                cat[key][k].extend(recs)
+                for rec in recs:
+                    if rec["path"] not in in_master:
+                        source_of[rec["path"]] = label
+        cat["extra_count"][label] = more["count"]
+    return cat, source_of
+
+
+def from_extra(tier, reason, hit, source_of):
+    """Adjust a tier when the match came from an extra catalogue. Plain copies
+    stay skipped. An edited export goes to review so the edit is still copied."""
+    label = source_of.get(hit)
+    if not label:
+        return tier, reason
+    if tier == 3:
+        return 4, "edited export of a photo in %s, copied so the edit reaches the master" % label
+    return tier, "%s (in %s)" % (reason, label)
 
 
 # ---------------------------------------------------------------------------
@@ -215,8 +250,9 @@ def tier_video(entry, cat, mtime_day):
     return 4, "catalogue video with the same name, different date", candidates[0]["path"]
 
 
-def cmd_match(originals, lrcat, exif_json, out_csv):
-    cat = load_catalogue(lrcat)
+def cmd_match(originals, lrcat, exif_json, out_csv, *extra_args):
+    extras = [tuple(a.split("=", 1)) for a in extra_args]
+    cat, source_of = load_catalogues(lrcat, extras)
     with open(exif_json, encoding="utf-8") as fh:
         entries = json.load(fh)
     rows = []
@@ -239,6 +275,7 @@ def cmd_match(originals, lrcat, exif_json, out_csv):
             tier, reason, hit = tier_video(e, cat, mtime_day)
         else:
             tier, reason, hit = tier_photo(e, cat)
+        tier, reason = from_extra(tier, reason, hit, source_of)
         sec, _ = exif_capture(e)
         capture_day = (sec or "")[:10] or mtime_day
         rows.append([rel, tier, TIER_NAMES[tier], reason, hit, capture_day, size,
@@ -272,6 +309,8 @@ def cmd_match(originals, lrcat, exif_json, out_csv):
     for r in rows:
         counts[r[1]] += 1
     print("Catalogue images indexed: %d" % cat["count"])
+    for label, n in cat["extra_count"].items():
+        print("Extra catalogue %s: %d" % (label, n))
     for t in sorted(TIER_NAMES):
         print("Tier %d %-14s %d" % (t, TIER_NAMES[t], counts[t]))
     print("Total iCloud files: %d" % len(rows))

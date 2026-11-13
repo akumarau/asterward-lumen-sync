@@ -129,7 +129,9 @@ This mirrors the `YYYY/YYYY-MM` convention already used by `/Volumes/TOSHIBA_AK/
 | 4 | Near match, such as a burst frame missing from the catalogue | Review |
 | 5 | Not in the catalogue | Copy |
 
-Matching uses camera model plus capture time to the millisecond, so Sony file counters that repeat across bodies cannot cause false matches. A Live Photo video always follows its still. The report at `manifests/06-match-report/index.html` shows thumbnails of each match side by side.
+Matching uses camera model plus capture time to the millisecond, so Sony file counters that repeat across bodies cannot cause false matches. A Live Photo video always follows its still.
+
+If other catalogues also hold photos, list them in `EXTRA_LRCATS` (paths separated by `:`). They are snapshotted and read the same way. A plain copy of one of their photos lands in tiers 1 or 2 and is skipped. An edited export of one lands in tier 4, with the catalogue named in the reason, so the edit is still copied into the master. The report at `manifests/06-match-report/index.html` shows thumbnails of each match side by side.
 
 `lumen-sync copy-new` then copies tier 5 into `DEST_LIBRARY/YYYY/YYYY-MM/YYYY-MM-DD`, verified by SHA-256, never overwriting. `originals/` stays a complete icloudpd mirror, so later syncs never download anything twice.
 
