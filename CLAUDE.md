@@ -63,7 +63,6 @@ Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any
 ## Pending decisions (need Anupam's explicit yes)
 
 - Delete `/Volumes/TOSHIBA_AK/LumenSync_Test` and the test catalogue. Deleting needs his approval in any case.
-- Review `quarantine/duplicates` before anything there is removed.
 - Open question: some tier 4 edits may come from frames kept in `Glam_Art` or `Studio`. `match` checks only the master today.
 
 ## Later (Step 3)
@@ -74,6 +73,7 @@ Run `tests/run-tests.sh` (or `TEST_BASH=/bin/bash tests/run-tests.sh`) after any
 ## Decisions already made
 
 - 13 Nov 2026: PR #1 merged to `main` (merge commit `0cdcfba`) and the repo renamed to `akumarau/asterward-lumen-sync`. The old URL redirects. The branch `asterward-lumen-sync` stays as the working branch.
+- 13 Nov 2026: Anupam approved moving the 66 files in `quarantine/duplicates` to the macOS Bin, a one-time exception to hard rule 1. All 66 were re-checked by SHA-256 against their kept twin in `originals/` first. Log: `manifests/03-dedupe-removed.csv`. The Bin on `TOSHIBA_AK` is not emptied. That is his call.
 - Option A: `originals` stays a pure icloudpd mirror. New files are copied, never moved.
 - Tier 4 (edits of frames culled from the catalogue) is imported, as well as tier 5.
 - `--set-exif-datetime` stays on, for consistency with files downloaded in August.
